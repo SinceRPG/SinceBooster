@@ -1,0 +1,41 @@
+# =====================================================
+#             SINCE BOOSTER CONFIGURATION
+# =====================================================
+
+# Cấu hình lưu trữ dữ liệu
+database:
+  # Loại dữ liệu: "SQLITE" hoặc "MYSQL"
+  type: "SQLITE"
+  
+  # Cấu hình cho MySQL (chỉ cần điền nếu type là MYSQL)
+  host: "localhost"
+  port: "3306"
+  database: "minecraft"
+  username: "root"
+  password: ""
+  
+  # Tên bảng trong database (Không nên đổi nếu đã có dữ liệu)
+  table_users: "sincebooster_users"
+  table_boosters: "sincebooster_boosters"
+
+# Cấu hình tính năng chia sẻ (Share Booster)
+share:
+  # Tốc độ trừ thời gian mặc định khi share (Decay Rate)
+  # 1.0 = Trừ bình thường (1 giây thực = 1 giây booster)
+  # 2.0 = Trừ nhanh gấp đôi (1 giây thực = 2 giây booster)
+  default-rate: 2.0
+  
+  # Hiệu quả Booster mà CHỦ SỞ HỮU nhận được khi đang share (Permanent Booster)
+  # 1.0 = 100% hiệu quả gốc
+  # 0.8 = 80% hiệu quả gốc (bị giảm do đang share)
+  default-owner-buff: 1.0
+  
+  # Hiệu quả Booster mà NGƯỜI NHẬN nhận được (Permanent Booster)
+  # 0.25 = 25% hiệu quả gốc của booster
+  default-receiver-buff: 0.25
+  
+  # Số lượng người tối đa mà một người chơi có thể nhận share cùng lúc
+  default-share-limit: 1
+
+# Thời gian tự động lưu dữ liệu người chơi xuống database (giây)
+auto-save: 300

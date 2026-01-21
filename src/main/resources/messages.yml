@@ -1,0 +1,189 @@
+# =====================================================
+#               MESSAGES & GUI CONFIG
+# =====================================================
+# Hỗ trợ mã màu & (Legacy) và MiniMessage (<green>, <gradient:red:blue>)
+
+prefix: "&8[&bSinceBooster&8] &r"
+
+admin:
+  reload: "&aĐã tải lại cấu hình thành công!"
+  view_title: "&8Kho Booster: &2<target>"
+  invalid_player: "&cXảy ra lỗi: Người chơi không tồn tại hoặc không trực tuyến."
+  set_rate_global: "&aĐã đặt giá trị Global &e<type> &athành &6<value>"
+  set_rate_player: "&aĐã đặt giá trị của &b<target> &e<type> &athành &6<value>"
+
+share:
+  invalid_target: "&cMục tiêu không hợp lệ."
+  self_interaction: "&cBạn không thể thực hiện hành động này với chính mình."
+  no_boosters_to_share: "&cBạn không có Booster nào khả dụng để chia sẻ."
+  invite_sent: "&aĐã gửi lời mời dùng chung &e<booster_display> &acho &b<target>&a. Hết hạn trong <time>s."
+  invite_received: "&b<player> &amuốn chia sẻ &e<booster_display> &avới bạn. Gõ &6/booster accept <player> &ađể nhận."
+
+  # Tin nhắn khi dùng /booster share <name> all
+  invite_batch_sent: "&aĐã gửi lời mời dùng chung &e<list> &acho &b<target>&a."
+  invite_batch_received: "&b<player> &amuốn chia sẻ &e<list> &avới bạn. Gõ &6/booster accept <player> &ađể nhận."
+  batch_separator: "&7, &e"
+
+  booster_not_found: "&cKhông tìm thấy Booster có ID: &e<id>"
+  invalid_sender: "&cNgười gửi không hợp lệ."
+  sender_offline_or_invalid: "&cNgười gửi lời mời hiện không trực tuyến."
+  no_invite: "&cBạn không có lời mời nào từ người chơi này hoặc lời mời đã hết hạn."
+
+  accepted_sender: "&b<target> &ađã chấp nhận dùng chung Booster của bạn!"
+  accepted_receiver: "&aBạn đã bắt đầu dùng chung Booster của &b<player>&a!"
+  limit_reached: "&cLỗi: Đã đạt giới hạn chia sẻ (<current>/<max>)."
+
+  kick_success: "&aĐã ngừng chia sẻ &e<booster> &avới &c<target>&a."
+  kick_target_notify: "&c<player> &đã ngừng chia sẻ &e<booster> &cvới bạn."
+  unknown_player: "&cKhông xác định"
+
+  owner_offline: "&cChủ sở hữu Booster hiện không online."
+  leave_success: "&aĐã hủy dùng chung các Booster từ &b<owner>&a."
+  leave_owner_notify: "&e<player> &ađã tự rời khỏi danh sách chia sẻ của bạn."
+  not_sharing_with_owner: "&cBạn đang không dùng chung Booster nào từ người này."
+
+booster:
+  receive:
+    extend: "&aBooster &e<id> &ađã được gia hạn thêm &b<time> giây&a!"
+    permanent: "&aBạn nhận được Booster Vĩnh viễn: &e<id> &7(x<multiplier>)&a!"
+    duration: "&aBạn nhận được Booster: &e<id> &7(x<multiplier> trong <time>s)&a!"
+  expired: "&cBooster &e<id> &ccủa bạn đã hết hạn!"
+
+  gui:
+    title: "&0Danh Sách Booster"
+    closed_on_reload: "&cGUI đã đóng do admin reload plugin."
+
+    # Định dạng thời gian
+    formats:
+      time_left: "&f<day>d <hour>h <min>m <sec>s"
+
+    # Nút chia sẻ (Ở giữa hàng dưới cùng)
+    share_button:
+      name: "&e&lChia sẻ Booster"
+      material: "OAK_SIGN"
+      slot: 49
+      lore:
+        - "&7Click để chọn người chơi"
+        - "&7và chia sẻ hiệu quả Booster."
+        - ""
+        - "&bClick để mở menu!"
+
+    # Item hiển thị Booster
+    item:
+      # Booster của chính mình
+      own:
+        name_time: "&6<id> &7(Còn lại: <time>)"
+        name_perm: "&d&lPERM: &6<id> &7(Vĩnh viễn)"
+        lore:
+          - "&7Loại: <type_color><type_name>"
+          - "&7Hệ số nhân: &e+<percent>%"
+          - ""
+          - "&7Trạng thái: <status>"
+          - "&7Đang chia sẻ với: &f<shared_count> người"
+          - "&7Tốc độ hao mòn: &c<decay_rate>x/s"
+          - "&7Hiệu suất bản thân: &a<efficiency>%"
+          - ""
+          - "&fDanh sách chia sẻ:"
+          - "<shared_list>"
+          - ""
+          - "&eClick &7để quản lý chia sẻ."
+
+      # Booster được người khác share cho mình
+      received:
+        name_time: "&bShare: &f<id> &7(<time>)"
+        name_perm: "&bShare: &dPERM &f<id>"
+        lore:
+          - "&7Chủ sở hữu: &f<owner_name>"
+          - "&7Loại: <type_color><type_name>"
+          - "&7Hệ số gốc: &e+<base_multiplier>x"
+          - ""
+          - "&7Hiệu suất nhận: &b<efficiency>%"
+          - "&7Thực nhận: &a+<real_multiplier>x"
+          - ""
+          - "&7Trạng thái: <status>"
+          - ""
+          - "&cShift + Click &7để hủy nhận share."
+
+      status_perm: "&aĐang hoạt động"
+      status_time: "&eHết hạn sau: &f<time_left>"
+      shared_list_none: "&7- (Chưa chia sẻ)"
+      shared_list_format: "&7- &f<player>"
+
+    # Tổng kết Class XP
+    summary_class:
+      material: "EXPERIENCE_BOTTLE"
+      name: "&aTổng kết Class XP"
+      lore:
+        - "&7Tổng hệ số: &e<total_multiplier>x &7(+<total_percent>%)"
+        - ""
+        - "&fChi tiết:"
+        - "&7- Của bạn: &a+<own_percent>%"
+        - "&7- Được share: &b+<shared_percent>%"
+
+    # Tổng kết Job/Profession XP
+    summary_prof:
+      material: "WRITABLE_BOOK"
+      name: "&6Tổng kết Nghề Nghiệp"
+      prof_format: "&7- <profession>: &e<multiplier>x &7(+<percent>%)"
+      prof_none: "&7Không có booster nghề nghiệp nào."
+      lore:
+        - "&7Các hệ số đang áp dụng:"
+        - ""
+        - "<prof_list>"
+
+    separator:
+      material: "BLACK_STAINED_GLASS_PANE"
+
+    empty_slot:
+      name: "&cChỗ trống"
+      lore:
+        - "&7Nhận thêm booster để lấp đầy!"
+
+# =====================================================
+#                 GUI: SHARE MANAGER
+# =====================================================
+share_gui:
+  # Menu chọn người chơi
+  player_selector:
+    title: "&0Chọn người nhận"
+    item_name: "&e<player_name>"
+    lore:
+      - "&7Click để chọn người này"
+      - "&7làm đối tượng chia sẻ."
+
+  # Menu chọn Booster để share
+  booster_selector:
+    title: "&0Chọn Booster để chia sẻ"
+    item:
+      name_time: "&6<id> &7(<time>)"
+      name_perm: "&d<id> &7(Vĩnh viễn)"
+      status_full: "&cĐã đầy (<current>/<max>)"
+      status_available: "&aCó thể share (<current>/<max>)"
+      lore:
+        - "&7Loại: <type_color><type_name>"
+        - "&7Hệ số: &e<multiplier>x &7(+<percent>%)"
+        - ""
+        - "&7Người nhận sẽ được: &b<rec_multiplier>x &7(+<rec_percent>%)"
+        - "&7Slot: <slot_color><status_text>"
+        - ""
+        - "&eClick để gửi lời mời!"
+
+  back_button:
+    material: "ARROW"
+    name: "&cQuay lại"
+
+# =====================================================
+#                GUI: MANAGE SHARES
+# =====================================================
+manage_share_gui:
+  title: "&0Quản lý người được share"
+  item_name: "&cKick: &f<player>"
+  lore:
+    - "&7Click để đuổi người chơi này"
+    - "&7khỏi danh sách hưởng booster."
+
+  empty:
+    name: "&cChưa share cho ai"
+    lore:
+      - "&7Booster này chưa được chia sẻ"
+      - "&7cho bất kỳ ai."

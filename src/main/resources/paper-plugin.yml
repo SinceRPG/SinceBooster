@@ -1,0 +1,17 @@
+name: SinceBooster
+version: '1.0'
+main: net.danh.sincebooster.SinceBooster
+api-version: '1.21'
+authors: [ VoChiDanh ]
+dependencies:
+  server:
+    MythicLib:
+      load: BEFORE
+      required: true
+    MMOCore:
+      load: BEFORE
+      required: true
+permissions:
+  sincebooster.admin:
+    description: Admin access
+    default: op
