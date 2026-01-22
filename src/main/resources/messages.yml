@@ -11,6 +11,8 @@ admin:
   invalid_player: "&cXảy ra lỗi: Người chơi không tồn tại hoặc không trực tuyến."
   set_rate_global: "&aĐã đặt giá trị Global &e<type> &athành &6<value>"
   set_rate_player: "&aĐã đặt giá trị của &b<target> &e<type> &athành &6<value>"
+  remove_success: "&aĐã xóa Booster &e<id> &akhỏi người chơi &b<target>&a."
+  remove_all_success: "&aĐã xóa &ctất cả &aBooster của người chơi &b<target>&a."
 
 share:
   invalid_target: "&cMục tiêu không hợp lệ."

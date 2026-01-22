@@ -19,7 +19,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.persistence.PersistentDataType;
-import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -112,8 +112,14 @@ public class ManageShareGUI implements Listener {
             ItemMeta meta = item.getItemMeta();
             if (meta.getPersistentDataContainer().has(targetKey, PersistentDataType.STRING)) {
                 String uuidStr = meta.getPersistentDataContainer().get(targetKey, PersistentDataType.STRING);
-                UUID targetUUID = UUID.fromString(uuidStr);
-                OfflinePlayer target = Bukkit.getOfflinePlayer(targetUUID);
+                UUID targetUUID = null;
+                if (uuidStr != null) {
+                    targetUUID = UUID.fromString(uuidStr);
+                }
+                OfflinePlayer target = null;
+                if (targetUUID != null) {
+                    target = Bukkit.getOfflinePlayer(targetUUID);
+                }
 
                 // KICK logic
                 plugin.getBoosterManager().getShareManager().kickShare(p, holder.boosterId, target);
@@ -132,7 +138,7 @@ public class ManageShareGUI implements Listener {
         }
 
         @Override
-        public @NotNull Inventory getInventory() {
+        public @Nullable Inventory getInventory() {
             return null;
         }
     }

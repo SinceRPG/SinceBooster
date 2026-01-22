@@ -19,7 +19,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.persistence.PersistentDataType;
-import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -38,6 +38,7 @@ public class ShareGUI implements Listener {
         return plugin.getMessagesFile();
     }
 
+    // --- HELPER METHODS ---
     public boolean isPlayerSelector(Component viewTitle) {
         String configTitleStr = getMsg().getString("share_gui.player_selector.title", "Chọn người nhận");
         Component configTitle = ColorUtils.parse(configTitleStr);
@@ -55,6 +56,8 @@ public class ShareGUI implements Listener {
         String configPlain = PlainTextComponentSerializer.plainText().serialize(configTitle);
         return viewPlain.equals(configPlain);
     }
+
+    // --- GUI OPENERS ---
 
     public void openPlayerSelector(Player p) {
         String titleStr = getMsg().getString("share_gui.player_selector.title", "Chọn người nhận");
@@ -111,10 +114,10 @@ public class ShareGUI implements Listener {
         ItemStack item = new ItemStack(mat);
         ItemMeta meta = item.getItemMeta();
 
-        // 1. Save Real ID to NBT
+        // 1. Lưu Booster ID vào item để xử lý khi click
         meta.getPersistentDataContainer().set(boosterIdKey, PersistentDataType.STRING, b.getId());
 
-        // 2. Determine Display Properties
+        // 2. Xác định tên và key
         String keyDur = b.isPermanent() ? "name_perm" : "name_time";
         String basePath = "share_gui.booster_selector.item.";
 
@@ -131,19 +134,24 @@ public class ShareGUI implements Listener {
         String typeColor = (b.getProfession() == null) ? "<aqua>" : "<green>";
         String typeName = (b.getProfession() == null) ? "Class XP" : "Job: " + b.getProfession().toUpperCase();
 
-        // Calculate Receiver Stats
+        // 3. Tính toán chỉ số cho người nhận
         double baseMult = b.getMultiplier();
-        double recEfficiency = 100.0;
-        if (b.isPermanent()) {
-            recEfficiency = plugin.getBoosterManager().getShareManager().getReceiverBuffRate(p.getUniqueId()) * 100.0;
-        }
+        double recEfficiency;
+
+        // Lấy thông số efficiency từ ShareManager (Giả sử bạn có method này, nếu không thì mặc định 100 hoặc lấy từ PlayerSession)
+        // Đây là efficiency của người CHIA SẺ, nhưng ta cần hiển thị người NHẬN sẽ nhận được bao nhiêu
+        // Mặc định lấy efficiency của chính người xem (p) hoặc config global
+        double receiverRateConfig = plugin.getPlayerDataHandler().getSession(p.getUniqueId()).getReceiverBuffRate();
+        recEfficiency = receiverRateConfig * 100.0;
+
         double recMult = 1.0 + ((baseMult - 1.0) * (recEfficiency / 100.0));
 
-        // Check Limit
+        // 4. Kiểm tra giới hạn
         int currentShare = b.getSharedPlayers().size();
         boolean isFull = currentShare >= maxShare;
         String slotColor = isFull ? "<red>" : "<green>";
         String statusText = getMsg().getString(isFull ? "share_gui.booster_selector.item.status_full" : "share_gui.booster_selector.item.status_available");
+        statusText = statusText.replace("<current>", String.valueOf(currentShare)).replace("<max>", String.valueOf(maxShare));
 
         for (String line : loreRaw) {
             line = line.replace("<type_color>", typeColor)
@@ -155,9 +163,6 @@ public class ShareGUI implements Listener {
                     .replace("<rec_percent>", String.valueOf((int) ((recMult - 1.0) * 100)))
 
                     .replace("<slot_color>", slotColor)
-                    .replace("<current>", String.valueOf(currentShare))
-                    .replace("<max>", String.valueOf(maxShare))
-
                     .replace("<status_text>", statusText);
 
             if (line.contains("\n")) {
@@ -188,7 +193,7 @@ public class ShareGUI implements Listener {
         Component title = e.getView().title();
         InventoryHolder holder = e.getInventory().getHolder();
 
-        // 1. Selector
+        // 1. Player Selector
         if (holder instanceof PlayerSelectorHolder || isPlayerSelector(title)) {
             e.setCancelled(true);
             ItemStack item = e.getCurrentItem();
@@ -223,15 +228,13 @@ public class ShareGUI implements Listener {
                 return;
             }
 
-            if (holder instanceof BoosterSelectorHolder selector) {
+            // Xử lý gửi lời mời
+            if (holder instanceof BoosterSelectorHolder(Player target)) {
                 String bId = getBoosterIdFromItem(item);
-                if (bId == null) return; // Not a valid booster item
+                if (bId == null) return;
 
-                // Check Limit Visual again (for safety)
-                int maxShare = plugin.getBoosterManager().getShareManager().getPlayerShareLimit(p);
-                // We rely on ShareManager.sendInvite to check actual object state
-
-                plugin.getBoosterManager().getShareManager().sendInvite(p, selector.target, bId);
+                // FIX: Không cần check maxShare ở đây vì sendInvite đã check
+                plugin.getBoosterManager().getShareManager().sendInvite(p, target, bId);
                 p.closeInventory();
             }
         }
@@ -260,22 +263,17 @@ public class ShareGUI implements Listener {
         return format.replace("<day>", String.valueOf(d)).replace("<hour>", String.valueOf(h)).replace("<min>", String.valueOf(m)).replace("<sec>", String.valueOf(s));
     }
 
+    // --- HOLDERS ---
     public static class PlayerSelectorHolder implements InventoryHolder {
         @Override
-        public @NotNull Inventory getInventory() {
+        public @Nullable Inventory getInventory() {
             return null;
         }
     }
 
-    public static class BoosterSelectorHolder implements InventoryHolder {
-        public final Player target;
-
-        public BoosterSelectorHolder(Player target) {
-            this.target = target;
-        }
-
+    public record BoosterSelectorHolder(Player target) implements InventoryHolder {
         @Override
-        public @NotNull Inventory getInventory() {
+        public @Nullable Inventory getInventory() {
             return null;
         }
     }

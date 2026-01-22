@@ -12,6 +12,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 public class PlayerDataHandler {
     private final SinceBooster plugin;
@@ -25,175 +26,166 @@ public class PlayerDataHandler {
         UUID uuid = p.getUniqueId();
 
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            List<Booster> boosters = new ArrayList<>();
-
-            // Default Values (-1 means use Global Config)
-            double shareRate = -1.0;
-            double ownerBuffRate = -1.0;
-            double receiverBuffRate = -1.0;
-            int shareLimit = -1;
-
-            try (Connection conn = plugin.getDatabaseManager().getConnection()) {
-                // 1. Load User Data (Rate & Limit)
-                String queryUser = "SELECT * FROM " + plugin.getDatabaseManager().getUsersTable() + " WHERE uuid = ?";
-                try (PreparedStatement ps = conn.prepareStatement(queryUser)) {
-                    ps.setString(1, uuid.toString());
-                    try (ResultSet rs = ps.executeQuery()) {
-                        if (rs.next()) {
-                            try {
-                                shareRate = rs.getDouble("share_rate");
-                            } catch (SQLException ignored) {
-                            }
-                            try {
-                                ownerBuffRate = rs.getDouble("owner_buff_rate");
-                            } catch (SQLException ignored) {
-                            }
-                            try {
-                                receiverBuffRate = rs.getDouble("receiver_buff_rate");
-                            } catch (SQLException ignored) {
-                            }
-                            try {
-                                shareLimit = rs.getInt("share_limit");
-                            } catch (SQLException ignored) {
-                            }
-                        }
-                    }
-                }
-
-                // 2. Load Boosters
-                String queryBooster = "SELECT * FROM " + plugin.getDatabaseManager().getBoostersTable() + " WHERE uuid = ?";
-                try (PreparedStatement ps = conn.prepareStatement(queryBooster)) {
-                    ps.setString(1, uuid.toString());
-                    try (ResultSet rs = ps.executeQuery()) {
-                        while (rs.next()) {
-                            String bId = rs.getString("booster_id");
-                            double mult = rs.getDouble("multiplier");
-                            String prof = rs.getString("profession");
-                            boolean perm = rs.getBoolean("is_permanent");
-                            long remaining = rs.getLong("remaining_time");
-                            String sharedRaw = rs.getString("shared_with");
-
-                            if (perm || remaining > 0) {
-                                long newEndTime = perm ? -1 : System.currentTimeMillis() + remaining;
-                                Booster b = new Booster(bId, mult, newEndTime, prof, perm, true);
-
-                                if (sharedRaw != null && !sharedRaw.isEmpty()) {
-                                    String[] split = sharedRaw.split(",");
-                                    for (String sUUID : split) {
-                                        if (sUUID != null && !sUUID.trim().isEmpty()) {
-                                            try {
-                                                b.addSharedPlayer(UUID.fromString(sUUID.trim()));
-                                            } catch (IllegalArgumentException ignored) {
-                                                // Log warning nếu cần
-                                            }
-                                        }
-                                    }
-                                }
-                                boosters.add(b);
-                            }
-                        }
-                    }
-                }
-            } catch (SQLException e) {
-                plugin.getLogger().severe("Could not load data for " + p.getName());
-                e.printStackTrace();
-            }
-
-            // Final variables for lambda
-            double fShare = shareRate;
-            double fOwner = ownerBuffRate;
-            double fReceiver = receiverBuffRate;
-            int fLimit = shareLimit;
+            PlayerSession session = loadSessionFromDatabase(uuid);
 
             Bukkit.getScheduler().runTask(plugin, () -> {
                 if (p.isOnline()) {
-                    PlayerSession session = new PlayerSession(boosters, fShare, fOwner, fReceiver, fLimit);
                     sessionMap.put(uuid, session);
-                    plugin.getBoosterManager().setActiveBoosters(uuid, boosters);
+                    // Cập nhật vào BoosterManager (đã bao gồm logic cache ngược)
+                    plugin.getBoosterManager().loadPlayerBoosters(uuid, session.getBoosters());
                 }
             });
         });
+    }
+
+    private PlayerSession loadSessionFromDatabase(UUID uuid) {
+        List<Booster> boosters = new ArrayList<>();
+        double shareRate = -1.0;
+        double ownerBuffRate = -1.0;
+        double receiverBuffRate = -1.0;
+        int shareLimit = -1;
+
+        try (Connection conn = plugin.getDatabaseManager().getConnection()) {
+            // 1. Load User Data
+            String queryUser = "SELECT * FROM " + plugin.getDatabaseManager().getUsersTable() + " WHERE uuid = ?";
+            try (PreparedStatement ps = conn.prepareStatement(queryUser)) {
+                ps.setString(1, uuid.toString());
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        shareRate = rs.getDouble("share_rate");
+                        ownerBuffRate = rs.getDouble("owner_buff_rate");
+                        receiverBuffRate = rs.getDouble("receiver_buff_rate");
+                        shareLimit = rs.getInt("share_limit");
+                    }
+                }
+            }
+
+            // 2. Load Boosters
+            String queryBooster = "SELECT * FROM " + plugin.getDatabaseManager().getBoostersTable() + " WHERE uuid = ?";
+            try (PreparedStatement ps = conn.prepareStatement(queryBooster)) {
+                ps.setString(1, uuid.toString());
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        Booster b = parseBoosterFromResultSet(rs);
+                        if (b != null) boosters.add(b);
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Could not load data for UUID: " + uuid);
+            e.printStackTrace();
+        }
+
+        return new PlayerSession(boosters, shareRate, ownerBuffRate, receiverBuffRate, shareLimit);
+    }
+
+    private Booster parseBoosterFromResultSet(ResultSet rs) throws SQLException {
+        boolean perm = rs.getBoolean("is_permanent");
+        long remaining = rs.getLong("remaining_time");
+
+        if (!perm && remaining <= 0) return null; // Expired
+
+        String bId = rs.getString("booster_id");
+        double mult = rs.getDouble("multiplier");
+        String prof = rs.getString("profession");
+        String sharedRaw = rs.getString("shared_with");
+
+        long newEndTime = perm ? -1 : System.currentTimeMillis() + remaining;
+        Booster b = new Booster(bId, mult, newEndTime, prof, perm, true);
+
+        if (sharedRaw != null && !sharedRaw.isEmpty()) {
+            // Tối ưu split bằng StringTokenizer hoặc split cơ bản nhưng check kỹ
+            for (String sUUID : sharedRaw.split(",")) {
+                if (!sUUID.isBlank()) {
+                    try {
+                        b.addSharedPlayer(UUID.fromString(sUUID.trim()));
+                    } catch (IllegalArgumentException ignored) {
+                    }
+                }
+            }
+        }
+        return b;
     }
 
     public void saveData(UUID uuid, boolean removeDataFromMemory) {
         if (!sessionMap.containsKey(uuid)) return;
         PlayerSession session = sessionMap.get(uuid);
 
-        // Snapshot session data
-        double shareRate = session.getShareRate();
-        double ownerBuff = session.getOwnerBuffRate();
-        double recBuff = session.getReceiverBuffRate();
-        int shareLimit = session.getShareLimit();
-        List<Booster> currentBoosters = plugin.getBoosterManager().getActiveBoosters(uuid);
-        List<Booster> saveBoosters = (currentBoosters != null) ? new ArrayList<>(currentBoosters) : new ArrayList<>();
+        // Snapshot data to avoid concurrency issues during async save
+        List<Booster> saveBoosters = new ArrayList<>(plugin.getBoosterManager().getBoosters(uuid)); // Lấy list an toàn
 
         if (removeDataFromMemory) {
             sessionMap.remove(uuid);
-            plugin.getBoosterManager().removeActiveBoosters(uuid);
+            plugin.getBoosterManager().unloadPlayerBoosters(uuid);
         }
 
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            try (Connection conn = plugin.getDatabaseManager().getConnection()) {
-                conn.setAutoCommit(false);
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> saveSessionToDatabase(uuid, session, saveBoosters));
+    }
 
-                // A. Save User (Updated with share_limit)
-                String upsertUser = plugin.getDatabaseManager().isMySQL()
-                        ? "INSERT INTO " + plugin.getDatabaseManager().getUsersTable() + " (uuid, share_rate, owner_buff_rate, receiver_buff_rate, share_limit) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE share_rate=VALUES(share_rate), owner_buff_rate=VALUES(owner_buff_rate), receiver_buff_rate=VALUES(receiver_buff_rate), share_limit=VALUES(share_limit)"
-                        : "INSERT OR REPLACE INTO " + plugin.getDatabaseManager().getUsersTable() + " (uuid, share_rate, owner_buff_rate, receiver_buff_rate, share_limit) VALUES (?, ?, ?, ?, ?)";
+    private void saveSessionToDatabase(UUID uuid, PlayerSession session, List<Booster> boosters) {
+        try (Connection conn = plugin.getDatabaseManager().getConnection()) {
+            conn.setAutoCommit(false); // Start Transaction
 
-                try (PreparedStatement ps = conn.prepareStatement(upsertUser)) {
-                    ps.setString(1, uuid.toString());
-                    ps.setDouble(2, shareRate);
-                    ps.setDouble(3, ownerBuff);
-                    ps.setDouble(4, recBuff);
-                    ps.setInt(5, shareLimit);
-                    ps.executeUpdate();
-                }
+            // A. Save User
+            String upsertUser = plugin.getDatabaseManager().isMySQL()
+                    ? "INSERT INTO " + plugin.getDatabaseManager().getUsersTable() + " (uuid, share_rate, owner_buff_rate, receiver_buff_rate, share_limit) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE share_rate=VALUES(share_rate), owner_buff_rate=VALUES(owner_buff_rate), receiver_buff_rate=VALUES(receiver_buff_rate), share_limit=VALUES(share_limit)"
+                    : "INSERT OR REPLACE INTO " + plugin.getDatabaseManager().getUsersTable() + " (uuid, share_rate, owner_buff_rate, receiver_buff_rate, share_limit) VALUES (?, ?, ?, ?, ?)";
 
-                // B. Save Boosters
-                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM " + plugin.getDatabaseManager().getBoostersTable() + " WHERE uuid = ?")) {
-                    ps.setString(1, uuid.toString());
-                    ps.executeUpdate();
-                }
-
-                if (!saveBoosters.isEmpty()) {
-                    String insBooster = "INSERT INTO " + plugin.getDatabaseManager().getBoostersTable() +
-                            " (uuid, booster_id, multiplier, profession, is_permanent, remaining_time, shared_with) VALUES (?, ?, ?, ?, ?, ?, ?)";
-
-                    try (PreparedStatement ps = conn.prepareStatement(insBooster)) {
-                        for (Booster b : saveBoosters) {
-                            if (b.isValid()) { // Double check valid
-                                ps.setString(1, uuid.toString());
-                                ps.setString(2, b.getId());
-                                ps.setDouble(3, b.getMultiplier());
-                                ps.setString(4, b.getProfession());
-                                ps.setBoolean(5, b.isPermanent());
-                                long remaining = b.isPermanent() ? 0 : Math.max(0, b.getEndTime() - System.currentTimeMillis());
-                                ps.setLong(6, remaining);
-
-                                StringBuilder sb = new StringBuilder();
-                                for (UUID u : b.getSharedPlayers()) {
-                                    if (sb.length() > 0) sb.append(",");
-                                    sb.append(u.toString());
-                                }
-                                ps.setString(7, sb.toString());
-                                ps.addBatch();
-                            }
-                        }
-                        ps.executeBatch();
-                    }
-                }
-                conn.commit(); // [GOOD] Commit transaction
-            } catch (SQLException e) {
-                plugin.getLogger().severe("Could not save data for UUID: " + uuid);
-                e.printStackTrace();
+            try (PreparedStatement ps = conn.prepareStatement(upsertUser)) {
+                ps.setString(1, uuid.toString());
+                ps.setDouble(2, session.getShareRate());
+                ps.setDouble(3, session.getOwnerBuffRate());
+                ps.setDouble(4, session.getReceiverBuffRate());
+                ps.setInt(5, session.getShareLimit());
+                ps.executeUpdate();
             }
-        });
+
+            // B. Save Boosters
+            // Xóa cũ trước
+            try (PreparedStatement ps = conn.prepareStatement("DELETE FROM " + plugin.getDatabaseManager().getBoostersTable() + " WHERE uuid = ?")) {
+                ps.setString(1, uuid.toString());
+                ps.executeUpdate();
+            }
+
+            // Insert mới
+            if (!boosters.isEmpty()) {
+                String insBooster = "INSERT INTO " + plugin.getDatabaseManager().getBoostersTable() +
+                        " (uuid, booster_id, multiplier, profession, is_permanent, remaining_time, shared_with) VALUES (?, ?, ?, ?, ?, ?, ?)";
+
+                try (PreparedStatement ps = conn.prepareStatement(insBooster)) {
+                    for (Booster b : boosters) {
+                        if (b.isValid()) {
+                            ps.setString(1, uuid.toString());
+                            ps.setString(2, b.getId());
+                            ps.setDouble(3, b.getMultiplier());
+                            ps.setString(4, b.getProfession());
+                            ps.setBoolean(5, b.isPermanent());
+                            long remaining = b.isPermanent() ? 0 : Math.max(0, b.getEndTime() - System.currentTimeMillis());
+                            ps.setLong(6, remaining);
+
+                            String sharedStr = b.getSharedPlayers().stream()
+                                    .map(UUID::toString)
+                                    .collect(Collectors.joining(","));
+                            ps.setString(7, sharedStr);
+                            ps.addBatch();
+                        }
+                    }
+                    ps.executeBatch();
+                }
+            }
+            conn.commit(); // Commit Transaction
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Could not save data for UUID: " + uuid);
+            e.printStackTrace();
+        }
     }
 
     public void saveAllSync() {
         for (UUID uuid : new HashSet<>(sessionMap.keySet())) {
-            saveData(uuid, false);
+            // Sync thì không chạy async task mà gọi thẳng logic save
+            PlayerSession session = sessionMap.get(uuid);
+            List<Booster> boosters = new ArrayList<>(plugin.getBoosterManager().getBoosters(uuid));
+            saveSessionToDatabase(uuid, session, boosters);
         }
     }
 
@@ -206,6 +198,7 @@ public class PlayerDataHandler {
         return sessionMap.get(uuid);
     }
 
+    // Class PlayerSession giữ nguyên, chỉ thêm Getter/Setter nếu thiếu
     public static class PlayerSession {
         private final List<Booster> boosters;
         private double shareRate;
@@ -221,6 +214,7 @@ public class PlayerDataHandler {
             this.shareLimit = shareLimit;
         }
 
+        // Getters & Setters
         public double getShareRate() {
             return shareRate;
         }

@@ -21,7 +21,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 
@@ -45,10 +45,12 @@ public class BoosterGUI implements Listener {
         new BukkitRunnable() {
             @Override
             public void run() {
+                // Chỉ loop qua những người đang mở đúng GUI
                 for (Player p : Bukkit.getOnlinePlayers()) {
-                    if (p.getOpenInventory().getTopInventory().getHolder() instanceof BoosterHolder) {
-                        BoosterHolder holder = (BoosterHolder) p.getOpenInventory().getTopInventory().getHolder();
-                        updateContent(p.getOpenInventory().getTopInventory(), holder.targetUUID);
+                    Inventory topInv = p.getOpenInventory().getTopInventory();
+                    // Pattern Matching for instanceof (Java 16+)
+                    if (topInv.getHolder() instanceof BoosterHolder(UUID targetUUID)) {
+                        updateContent(topInv, targetUUID);
                     }
                 }
             }
@@ -123,7 +125,13 @@ public class BoosterGUI implements Listener {
         for (int i = 18; i < 27; i++) {
             if (i == 21) inv.setItem(i, createClassSummary(displayList));
             else if (i == 23) inv.setItem(i, createProfSummary(displayList));
-            else inv.setItem(i, glass);
+            else {
+                // Check trước khi set để tránh gửi packet thừa
+                ItemStack current = inv.getItem(i);
+                if (current == null || !current.isSimilar(glass)) {
+                    inv.setItem(i, glass);
+                }
+            }
         }
 
         fillSection(inv, profBoosters, 27, 54);
@@ -143,10 +151,9 @@ public class BoosterGUI implements Listener {
                 newItem = createBoosterItem(list.get(i));
             } else {
                 if (list.isEmpty() && i == (limit / 2)) newItem = createEmptyItem();
-                else newItem = null; // Slot trống
+                else newItem = null;
             }
 
-            // --- ĐOẠN TỐI ƯU CHỐNG NHẤP NHÁY (ANTI-FLICKER) ---
             ItemStack currentItem = inv.getItem(slot);
 
             if (newItem == null) {
@@ -154,16 +161,15 @@ public class BoosterGUI implements Listener {
                 continue;
             }
 
-            // Nếu slot hiện tại trống hoặc loại item khác nhau -> Set mới hoàn toàn
             if (currentItem == null || currentItem.getType() != newItem.getType()) {
                 inv.setItem(slot, newItem);
             } else {
-                // Nếu cùng loại item, chỉ update Meta (Lore/Name) để giữ Tooltip không bị tắt
+                // Chỉ update ItemMeta nếu khác biệt
                 ItemMeta currentMeta = currentItem.getItemMeta();
                 ItemMeta newMeta = newItem.getItemMeta();
 
-                // So sánh xem Meta có khác nhau không mới update
-                if (!currentMeta.equals(newMeta)) {
+                // equals của ItemMeta trong Bukkit đôi khi chậm, nhưng vẫn nhanh hơn gửi packet update slot
+                if (!Bukkit.getItemFactory().equals(currentMeta, newMeta)) {
                     currentItem.setItemMeta(newMeta);
                 }
             }
@@ -395,7 +401,7 @@ public class BoosterGUI implements Listener {
     @EventHandler
     public void onClick(InventoryClickEvent e) {
         // [IMPORTANT] Check if this is BoosterGUI using the Holder
-        if (!(e.getInventory().getHolder() instanceof BoosterHolder holder)) return;
+        if (!(e.getInventory().getHolder() instanceof BoosterHolder(UUID targetUUID))) return;
 
         e.setCancelled(true);
 
@@ -405,7 +411,7 @@ public class BoosterGUI implements Listener {
             Player p = (Player) e.getWhoClicked();
 
             // Check if viewer is owner of the GUI
-            boolean isSelfView = holder.targetUUID.equals(p.getUniqueId());
+            boolean isSelfView = targetUUID.equals(p.getUniqueId());
 
             if (slot == shareSlot) {
                 if (isSelfView) {
@@ -420,16 +426,24 @@ public class BoosterGUI implements Listener {
                 if (meta.getPersistentDataContainer().has(boosterIdKey, PersistentDataType.STRING)) {
                     String bId = meta.getPersistentDataContainer().get(boosterIdKey, PersistentDataType.STRING);
                     String ownerUuidStr = meta.getPersistentDataContainer().get(ownerUuidKey, PersistentDataType.STRING);
-                    UUID boosterOwnerUUID = UUID.fromString(ownerUuidStr);
+                    UUID boosterOwnerUUID = null;
+                    if (ownerUuidStr != null) {
+                        boosterOwnerUUID = UUID.fromString(ownerUuidStr);
+                    }
 
-                    if (boosterOwnerUUID.equals(p.getUniqueId())) {
+                    if (Objects.equals(boosterOwnerUUID, p.getUniqueId())) {
                         // OWNER CLICK -> MANAGE SHARE (Only if viewing self)
                         if (isSelfView) new ManageShareGUI(plugin).open(p, bId);
                     } else {
                         // RECEIVER CLICK -> LEAVE SHARE (Shift-Click, Only if viewing self)
                         if (e.getClick().isShiftClick() && isSelfView) {
-                            OfflinePlayer owner = Bukkit.getOfflinePlayer(boosterOwnerUUID);
-                            plugin.getBoosterManager().getShareManager().leaveShare(p, owner);
+                            OfflinePlayer owner = null;
+                            if (boosterOwnerUUID != null) {
+                                owner = Bukkit.getOfflinePlayer(boosterOwnerUUID);
+                            }
+                            if (owner != null) {
+                                plugin.getBoosterManager().getShareManager().leaveShare(p, owner);
+                            }
                             p.closeInventory();
                         }
                     }
@@ -457,15 +471,10 @@ public class BoosterGUI implements Listener {
         }
     }
 
-    public static class BoosterHolder implements InventoryHolder {
-        public final UUID targetUUID;
-
-        public BoosterHolder(UUID targetUUID) {
-            this.targetUUID = targetUUID;
-        }
+    public record BoosterHolder(UUID targetUUID) implements InventoryHolder {
 
         @Override
-        public @NotNull Inventory getInventory() {
+        public @Nullable Inventory getInventory() {
             return null;
         }
     }

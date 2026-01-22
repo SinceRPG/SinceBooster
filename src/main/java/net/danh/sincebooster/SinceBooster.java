@@ -14,8 +14,8 @@ import net.danh.sincebooster.gui.BoosterGUI;
 import net.danh.sincebooster.gui.ManageShareGUI;
 import net.danh.sincebooster.gui.ShareGUI;
 import net.danh.sincebooster.hooks.MMOCoreHook;
-import net.danh.sincebooster.manager.BoosterManager;
 import net.danh.sincebooster.manager.Booster;
+import net.danh.sincebooster.manager.BoosterManager;
 import net.danh.sincebooster.utils.ColorUtils;
 import net.danh.sincebooster.utils.ConfigUtils;
 import net.kyori.adventure.text.minimessage.MiniMessage;
@@ -27,6 +27,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.jspecify.annotations.NonNull;
 
 import java.util.List;
+import java.util.Objects;
 
 public final class SinceBooster extends JavaPlugin {
     private static SinceBooster plugin;
@@ -69,7 +70,7 @@ public final class SinceBooster extends JavaPlugin {
                 new ManageShareGUI(this)
         );
 
-        // 5. Hook MMOCore (Fix: Check dependency)
+        // 5. Hook MMOCore
         if (Bukkit.getPluginManager().isPluginEnabled("MMOCore")) {
             getServer().getPluginManager().registerEvents(new MMOCoreHook(this), this);
             getLogger().info("Hooked into MMOCore successfully!");
@@ -113,17 +114,11 @@ public final class SinceBooster extends JavaPlugin {
 
     private void registerCommands() {
         getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event -> {
-
-            // ==============================================================================
-            //                              BOOSTER COMMAND
-            // ==============================================================================
             event.registrar().register(Commands.literal("booster")
-                    // Mở GUI cho bản thân
                     .executes(ctx -> {
                         if (ctx.getSource().getExecutor() instanceof Player p) boosterGUI.open(p);
                         return 1;
                     })
-                    // RELOAD
                     .then(Commands.literal("reload")
                             .requires(s -> s.getSender().hasPermission("sincebooster.admin"))
                             .executes(ctx -> {
@@ -132,7 +127,6 @@ public final class SinceBooster extends JavaPlugin {
                                 return 1;
                             })
                     )
-                    // Lệnh View (Xem kho bản thân hoặc Admin xem người khác)
                     .then(Commands.literal("view")
                             .executes(ctx -> {
                                 if (ctx.getSource().getExecutor() instanceof Player p) boosterGUI.open(p);
@@ -155,21 +149,81 @@ public final class SinceBooster extends JavaPlugin {
                                     })
                             )
                     )
+                    // ==========================================
+                    //           NEW COMMAND: REMOVE
+                    // ==========================================
+                    .then(Commands.literal("remove")
+                            .requires(s -> s.getSender().hasPermission("sincebooster.admin"))
+                            .then(Commands.argument("target", StringArgumentType.word())
+                                    .suggests((ctx, builder) -> suggestPlayers(builder))
+                                    .then(Commands.argument("booster_id", StringArgumentType.word())
+                                            .suggests((ctx, builder) -> {
+                                                // 1. Luôn gợi ý 'all'
+                                                builder.suggest("all");
 
-                    // --- GIVE COMMAND ---
+                                                // 2. Lấy tên người chơi từ tham số "target" phía trước
+                                                try {
+                                                    String tName = StringArgumentType.getString(ctx, "target");
+                                                    Player t = Bukkit.getPlayer(tName);
+
+                                                    if (t != null) {
+                                                        // 3. Lấy danh sách booster thực tế của người đó để gợi ý
+                                                        List<Booster> list = boosterManager.getActiveBoosters(t.getUniqueId());
+                                                        if (list != null) {
+                                                            for (Booster b : list) {
+                                                                builder.suggest(b.getId());
+                                                            }
+                                                        }
+                                                    }
+                                                } catch (IllegalArgumentException ignored) {
+                                                    // Bỏ qua lỗi nếu Brigadier chưa parse xong arg trước đó (lúc đang gõ dở)
+                                                }
+                                                return builder.buildFuture();
+                                            })
+                                            .executes(ctx -> {
+                                                String tName = StringArgumentType.getString(ctx, "target");
+                                                String bId = StringArgumentType.getString(ctx, "booster_id");
+                                                Player t = Bukkit.getPlayer(tName);
+
+                                                if (t == null) {
+                                                    ctx.getSource().getSender().sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("admin.invalid_player")));
+                                                    return 0;
+                                                }
+
+                                                // Xử lý xóa
+                                                if (bId.equalsIgnoreCase("all")) {
+                                                    boosterManager.removeAllBoosters(t);
+                                                    ctx.getSource().getSender().sendMessage(ColorUtils.parseWithPrefix(
+                                                            messagesFile.getString("admin.remove_all_success").replace("<target>", t.getName())
+                                                    ));
+                                                } else {
+                                                    boolean success = boosterManager.removeBooster(t, bId);
+                                                    if (success) {
+                                                        ctx.getSource().getSender().sendMessage(ColorUtils.parseWithPrefix(
+                                                                messagesFile.getString("admin.remove_success")
+                                                                        .replace("<target>", t.getName())
+                                                                        .replace("<id>", bId)
+                                                        ));
+                                                    } else {
+                                                        ctx.getSource().getSender().sendMessage(ColorUtils.parseWithPrefix(
+                                                                messagesFile.getString("share.booster_not_found").replace("<id>", bId)
+                                                        ));
+                                                    }
+                                                }
+                                                return 1;
+                                            })
+                                    )
+                            )
+                    )
                     .then(Commands.literal("give")
                             .requires(s -> s.getSender().hasPermission("sincebooster.admin"))
                             .then(Commands.argument("target", StringArgumentType.word())
                                     .suggests((ctx, builder) -> suggestPlayers(builder))
                                     .then(Commands.argument("id", StringArgumentType.word())
                                             .then(Commands.argument("multiplier", DoubleArgumentType.doubleArg(0.1))
-                                                    // Nhánh Duration
                                                     .then(Commands.literal("duration")
                                                             .then(Commands.argument("seconds", LongArgumentType.longArg(1))
-                                                                    .executes(ctx -> {
-                                                                        // Gọi trực tiếp, không qua handleGive chung
-                                                                        return executeGive(ctx, false, null);
-                                                                    })
+                                                                    .executes(ctx -> executeGive(ctx, false, null))
                                                                     .then(Commands.argument("profession", StringArgumentType.word())
                                                                             .suggests((ctx, builder) -> suggestProfessions(builder))
                                                                             .executes(ctx -> {
@@ -179,11 +233,8 @@ public final class SinceBooster extends JavaPlugin {
                                                                     )
                                                             )
                                                     )
-                                                    // Nhánh Permanent
                                                     .then(Commands.literal("permanent")
-                                                            .executes(ctx -> {
-                                                                return executeGive(ctx, true, null);
-                                                            })
+                                                            .executes(ctx -> executeGive(ctx, true, null))
                                                             .then(Commands.argument("profession", StringArgumentType.word())
                                                                     .suggests((ctx, builder) -> suggestProfessions(builder))
                                                                     .executes(ctx -> {
@@ -196,45 +247,23 @@ public final class SinceBooster extends JavaPlugin {
                                     )
                             )
                     )
-
-                    // --- SHARE COMMAND ---
                     .then(Commands.literal("share")
                             .then(Commands.argument("target", StringArgumentType.word())
                                     .suggests((ctx, builder) -> suggestPlayers(builder))
-
-                                    // 1. Share All (Sử dụng InviteBatch để gộp tin nhắn)
                                     .then(Commands.literal("all").executes(ctx -> {
                                         Player p = (Player) ctx.getSource().getExecutor();
                                         Player t = Bukkit.getPlayer(StringArgumentType.getString(ctx, "target"));
-
-                                        if (t == null) {
-                                            if (p != null) {
-                                                p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.invalid_target")));
-                                            }
-                                            return 0;
+                                        if (validateShare(p, t)) {
+                                            List<Booster> list = boosterManager.getActiveBoosters(Objects.requireNonNull(p).getUniqueId());
+                                            boosterManager.getShareManager().sendInviteBatch(p, t, list);
                                         }
-                                        if (p != null && t.getUniqueId().equals(p.getUniqueId())) {
-                                            p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.self_interaction")));
-                                            return 0;
-                                        }
-
-                                        // [FIX] Dùng sendInviteBatch thay vì sendInvite("all") cũ
-                                        List<Booster> list = null;
-                                        if (p != null) {
-                                            list = boosterManager.getActiveBoosters(p.getUniqueId());
-                                        }
-                                        boosterManager.getShareManager().sendInviteBatch(p, t, list);
                                         return 1;
                                     }))
-
-                                    // 2. Share Specific Booster
                                     .then(Commands.argument("booster_id", StringArgumentType.word())
                                             .suggests((ctx, builder) -> {
                                                 if (ctx.getSource().getExecutor() instanceof Player p) {
                                                     List<Booster> list = boosterManager.getActiveBoosters(p.getUniqueId());
-                                                    if (list != null)
-                                                        for (Booster b : list)
-                                                            builder.suggest(b.getId());
+                                                    if (list != null) for (Booster b : list) builder.suggest(b.getId());
                                                 }
                                                 return builder.buildFuture();
                                             })
@@ -242,123 +271,59 @@ public final class SinceBooster extends JavaPlugin {
                                                 Player p = (Player) ctx.getSource().getExecutor();
                                                 Player t = Bukkit.getPlayer(StringArgumentType.getString(ctx, "target"));
                                                 String bId = StringArgumentType.getString(ctx, "booster_id");
-
-                                                if (t == null) {
-                                                    if (p != null) {
-                                                        p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.invalid_target")));
-                                                    }
-                                                    return 0;
+                                                if (validateShare(p, t)) {
+                                                    boosterManager.getShareManager().sendInvite(Objects.requireNonNull(p), t, bId);
                                                 }
-                                                if (p != null && t.getUniqueId().equals(p.getUniqueId())) {
-                                                    p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.self_interaction")));
-                                                    return 0;
-                                                }
-
-                                                // Check sở hữu
-                                                boolean hasBooster = false;
-                                                List<Booster> list = null;
-                                                if (p != null) {
-                                                    list = boosterManager.getActiveBoosters(p.getUniqueId());
-                                                }
-                                                if (list != null) {
-                                                    for (Booster b : list) {
-                                                        if (b.getId().equalsIgnoreCase(bId)) {
-                                                            hasBooster = true;
-                                                            break;
-                                                        }
-                                                    }
-                                                }
-
-                                                if (!hasBooster) {
-                                                    ctx.getSource().getSender().sendMessage(ColorUtils.parseWithPrefix(
-                                                            messagesFile.getString("share.booster_not_found").replace("<id>", bId)
-                                                    ));
-                                                    return 0;
-                                                }
-
-                                                boosterManager.getShareManager().sendInvite(p, t, bId);
                                                 return 1;
                                             })
                                     )
                             )
                     )
-
-                    // --- ACCEPT COMMAND ---
                     .then(Commands.literal("accept")
                             .then(Commands.argument("sender", StringArgumentType.word())
                                     .suggests((ctx, builder) -> {
                                         if (ctx.getSource().getExecutor() instanceof Player p) {
-                                            List<String> senders = boosterManager.getShareManager().getPendingSenders(p);
-                                            for (String name : senders) builder.suggest(name);
+                                            for (String name : boosterManager.getShareManager().getPendingSenders(p))
+                                                builder.suggest(name);
                                         }
                                         return builder.buildFuture();
                                     })
                                     .executes(ctx -> {
                                         Player p = (Player) ctx.getSource().getExecutor();
                                         Player s = Bukkit.getPlayer(StringArgumentType.getString(ctx, "sender"));
-
-                                        if (s == null) {
-                                            if (p != null) {
-                                                p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.invalid_sender")));
-                                            }
-                                            return 0;
-                                        }
-                                        if (p != null && s.getUniqueId().equals(p.getUniqueId())) {
-                                            p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.self_interaction")));
-                                            return 0;
-                                        }
-
-                                        if (p != null) {
-                                            boosterManager.getShareManager().acceptInvite(p, s);
-                                        }
+                                        if (s != null && p != null) boosterManager.getShareManager().acceptInvite(p, s);
                                         return 1;
                                     })
                             )
                     )
-
-                    // --- LEAVE COMMAND ---
                     .then(Commands.literal("leave")
                             .then(Commands.argument("owner", StringArgumentType.word())
-                                    // Gợi ý những người đang share cho mình
                                     .suggests((ctx, builder) -> {
                                         if (ctx.getSource().getExecutor() instanceof Player p) {
-                                            List<String> owners = boosterManager.getShareManager().getOwnersSharingWith(p);
-                                            for (String name : owners) builder.suggest(name);
+                                            for (String name : boosterManager.getShareManager().getOwnersSharingWith(p))
+                                                builder.suggest(name);
                                         }
                                         return builder.buildFuture();
                                     })
                                     .executes(ctx -> {
                                         Player p = (Player) ctx.getSource().getExecutor();
-                                        String oName = StringArgumentType.getString(ctx, "owner");
-                                        Player owner = Bukkit.getPlayer(oName);
-
-                                        if (owner == null) {
-                                            if (p != null) {
-                                                p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("admin.invalid_player")));
-                                            }
-                                            return 0;
-                                        }
-
-                                        boosterManager.getShareManager().leaveShare(p, owner);
+                                        Player owner = Bukkit.getPlayer(StringArgumentType.getString(ctx, "owner"));
+                                        if (owner != null && p != null)
+                                            boosterManager.getShareManager().leaveShare(p, owner);
                                         return 1;
                                     })
                             )
                     )
-
-                    // --- KICK COMMAND ---
                     .then(Commands.literal("kick")
                             .then(Commands.argument("booster_id", StringArgumentType.word())
-                                    // Gợi ý booster mình đang có
                                     .suggests((ctx, builder) -> {
                                         if (ctx.getSource().getExecutor() instanceof Player p) {
                                             List<Booster> list = boosterManager.getActiveBoosters(p.getUniqueId());
-                                            if (list != null) for (Booster b : list)
-                                                builder.suggest(b.getId());
+                                            if (list != null) for (Booster b : list) builder.suggest(b.getId());
                                         }
                                         return builder.buildFuture();
                                     })
                                     .then(Commands.argument("target", StringArgumentType.word())
-                                            // Gợi ý người đang được share booster này
                                             .suggests((ctx, builder) -> {
                                                 if (ctx.getSource().getExecutor() instanceof Player p) {
                                                     String bId = StringArgumentType.getString(ctx, "booster_id");
@@ -381,26 +346,14 @@ public final class SinceBooster extends JavaPlugin {
                                             .executes(ctx -> {
                                                 Player p = (Player) ctx.getSource().getExecutor();
                                                 String bId = StringArgumentType.getString(ctx, "booster_id");
-                                                String tName = StringArgumentType.getString(ctx, "target");
-                                                Player t = Bukkit.getPlayer(tName);
-
-                                                if (t == null) {
-                                                    if (p != null) {
-                                                        p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("admin.invalid_player")));
-                                                    }
-                                                    return 0;
-                                                }
-
-                                                if (p != null) {
+                                                Player t = Bukkit.getPlayer(StringArgumentType.getString(ctx, "target"));
+                                                if (t != null && p != null)
                                                     boosterManager.getShareManager().kickShare(p, bId, t);
-                                                }
                                                 return 1;
                                             })
                                     )
                             )
                     )
-
-                    // --- SET RATE COMMAND ---
                     .then(Commands.literal("set-rate")
                             .requires(s -> s.getSender().hasPermission("sincebooster.admin"))
                             .then(Commands.argument("type", StringArgumentType.word())
@@ -412,47 +365,32 @@ public final class SinceBooster extends JavaPlugin {
                                         return builder.buildFuture();
                                     })
                                     .then(Commands.argument("value", DoubleArgumentType.doubleArg(0.0))
-                                            // Set Global
                                             .executes(ctx -> {
                                                 String type = StringArgumentType.getString(ctx, "type");
                                                 double val = DoubleArgumentType.getDouble(ctx, "value");
-                                                switch (type) {
-                                                    case "decay" ->
-                                                            boosterManager.getShareManager().setGlobalValue("default-rate", val);
-                                                    case "owner" ->
-                                                            boosterManager.getShareManager().setGlobalValue("default-owner-buff", val);
-                                                    case "receiver" ->
-                                                            boosterManager.getShareManager().setGlobalValue("default-receiver-buff", val);
-                                                    case "limit" ->
-                                                            boosterManager.getShareManager().setGlobalValue("default-share-limit", val);
-                                                }
+                                                boosterManager.getShareManager().setGlobalValue(typeToConfig(type), val);
                                                 ctx.getSource().getSender().sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("admin.set_rate_global").replace("<type>", type).replace("<value>", String.valueOf(val))));
                                                 return 1;
                                             })
-                                            // Set Player
                                             .then(Commands.argument("target", StringArgumentType.word())
                                                     .suggests((ctx, builder) -> suggestPlayers(builder))
                                                     .executes(ctx -> {
                                                         String type = StringArgumentType.getString(ctx, "type");
                                                         double val = DoubleArgumentType.getDouble(ctx, "value");
                                                         Player t = Bukkit.getPlayer(StringArgumentType.getString(ctx, "target"));
-
-                                                        if (t == null) {
-                                                            ctx.getSource().getSender().sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("admin.invalid_player")));
-                                                            return 0;
-                                                        }
-
-                                                        PlayerDataHandler.PlayerSession s = playerDataHandler.getSession(t.getUniqueId());
-                                                        if (s != null) {
-                                                            switch (type) {
-                                                                case "decay" -> s.setShareRate(val);
-                                                                case "owner" -> s.setOwnerBuffRate(val);
-                                                                case "receiver" -> s.setReceiverBuffRate(val);
-                                                                case "limit" -> s.setShareLimit((int) val);
+                                                        if (t != null) {
+                                                            PlayerDataHandler.PlayerSession s = playerDataHandler.getSession(t.getUniqueId());
+                                                            if (s != null) {
+                                                                switch (type) {
+                                                                    case "decay" -> s.setShareRate(val);
+                                                                    case "owner" -> s.setOwnerBuffRate(val);
+                                                                    case "receiver" -> s.setReceiverBuffRate(val);
+                                                                    case "limit" -> s.setShareLimit((int) val);
+                                                                }
+                                                                playerDataHandler.saveData(t.getUniqueId(), false);
                                                             }
-                                                            playerDataHandler.saveData(t.getUniqueId(), false);
+                                                            ctx.getSource().getSender().sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("admin.set_rate_player").replace("<type>", type).replace("<target>", t.getName()).replace("<value>", String.valueOf(val))));
                                                         }
-                                                        ctx.getSource().getSender().sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("admin.set_rate_player").replace("<type>", type).replace("<target>", t.getName()).replace("<value>", String.valueOf(val))));
                                                         return 1;
                                                     })
                                             )
@@ -461,8 +399,19 @@ public final class SinceBooster extends JavaPlugin {
                     )
                     .build(), "Booster commands"
             );
-
         });
+    }
+
+    private boolean validateShare(Player p, Player t) {
+        if (t == null) {
+            if (p != null) p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.invalid_target")));
+            return false;
+        }
+        if (p != null && t.getUniqueId().equals(p.getUniqueId())) {
+            p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.self_interaction")));
+            return false;
+        }
+        return true;
     }
 
     private java.util.concurrent.CompletableFuture<com.mojang.brigadier.suggestion.Suggestions> suggestPlayers(com.mojang.brigadier.suggestion.SuggestionsBuilder builder) {
@@ -480,16 +429,9 @@ public final class SinceBooster extends JavaPlugin {
         String tName = StringArgumentType.getString(ctx, "target");
         Player t = Bukkit.getPlayer(tName);
         if (t == null) return 0;
-
         String id = StringArgumentType.getString(ctx, "id");
         double mult = DoubleArgumentType.getDouble(ctx, "multiplier");
-
-        // Nếu perm = true, duration = 0. Nếu false, lấy từ arg "seconds"
-        long sec = 0;
-        if (!isPerm) {
-            sec = LongArgumentType.getLong(ctx, "seconds");
-        }
-
+        long sec = isPerm ? 0 : LongArgumentType.getLong(ctx, "seconds");
         boosterManager.giveBooster(t, id, mult, sec, prof, isPerm);
         return 1;
     }

@@ -12,19 +12,21 @@ import java.sql.Statement;
 public class DatabaseManager {
 
     private final SinceBooster plugin;
+    private final boolean isMySQL; // Cache giá trị này
     private HikariDataSource dataSource;
 
     public DatabaseManager(SinceBooster plugin) {
         this.plugin = plugin;
+        // Cache ngay từ đầu để không phải check string mỗi lần gọi
+        this.isMySQL = plugin.getConfigFile().getString("database.type", "SQLITE").equalsIgnoreCase("MYSQL");
         setupDataSource();
         createTables();
     }
 
     private void setupDataSource() {
-        String type = plugin.getConfigFile().getString("database.type", "SQLITE");
         HikariConfig config = new HikariConfig();
 
-        if (type.equalsIgnoreCase("MYSQL")) {
+        if (isMySQL) {
             String host = plugin.getConfigFile().getString("database.host");
             String port = plugin.getConfigFile().getString("database.port");
             String db = plugin.getConfigFile().getString("database.database");
@@ -34,10 +36,13 @@ public class DatabaseManager {
             config.setJdbcUrl("jdbc:mysql://" + host + ":" + port + "/" + db + "?useSSL=false&autoReconnect=true&characterEncoding=UTF-8");
             config.setUsername(user);
             config.setPassword(pass);
+            // Các thuộc tính tối ưu cho MySQL
             config.addDataSourceProperty("cachePrepStmts", "true");
             config.addDataSourceProperty("prepStmtCacheSize", "250");
             config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
             config.addDataSourceProperty("useServerPrepStmts", "true");
+            config.addDataSourceProperty("useLocalSessionState", "true");
+            config.addDataSourceProperty("rewriteBatchedStatements", "true"); // Quan trọng cho việc save hàng loạt
         } else {
             File file = new File(plugin.getDataFolder(), "database.db");
             config.setJdbcUrl("jdbc:sqlite:" + file.getAbsolutePath());
@@ -69,33 +74,23 @@ public class DatabaseManager {
             String usersTable = getUsersTable();
             String boostersTable = getBoostersTable();
 
-            // Bảng User: Lưu thông tin Pet và các Rate tùy chỉnh
-            String sqlUsers = "CREATE TABLE IF NOT EXISTS " + usersTable + " (" +
-                    "uuid VARCHAR(36) PRIMARY KEY, " +
-                    "share_rate DOUBLE DEFAULT -1, " +
-                    "owner_buff_rate DOUBLE DEFAULT -1, " +
-                    "receiver_buff_rate DOUBLE DEFAULT -1, " +
-                    "share_limit INT DEFAULT -1" + // [NEW]
-                    ");";
+            // Sử dụng Text Block cho dễ đọc
+            String sqlUsers = """
+                    CREATE TABLE IF NOT EXISTS %s (
+                        uuid VARCHAR(36) PRIMARY KEY,
+                        share_rate DOUBLE DEFAULT -1,
+                        owner_buff_rate DOUBLE DEFAULT -1,
+                        receiver_buff_rate DOUBLE DEFAULT -1,
+                        share_limit INT DEFAULT -1
+                    );
+                    """.formatted(usersTable);
             stmt.execute(sqlUsers);
 
-            // Bảng Booster: Lưu thông tin booster và danh sách người được share
-            String autoInc = isMySQL() ? "AUTO_INCREMENT" : "AUTOINCREMENT";
-            String sqlBoosters = "CREATE TABLE IF NOT EXISTS " + boostersTable + " (" +
-                    "id INTEGER PRIMARY KEY " + autoInc + ", " +
-                    "uuid VARCHAR(36) NOT NULL, " +
-                    "booster_id VARCHAR(64) NOT NULL, " +
-                    "multiplier DOUBLE NOT NULL, " +
-                    "profession VARCHAR(64), " +
-                    "is_permanent BOOLEAN NOT NULL, " +
-                    "remaining_time BIGINT NOT NULL, " +
-                    "shared_with TEXT" + // Danh sách UUID được share (cách nhau bởi dấu phẩy)
-                    ");";
+            String sqlBoosters = getString(boostersTable);
             stmt.execute(sqlBoosters);
 
-            // Index để load nhanh hơn
             try {
-                stmt.execute("CREATE INDEX idx_booster_uuid ON " + boostersTable + " (uuid);");
+                stmt.execute("CREATE INDEX IF NOT EXISTS idx_booster_uuid ON " + boostersTable + " (uuid);");
             } catch (SQLException ignored) {
             }
 
@@ -105,8 +100,24 @@ public class DatabaseManager {
         }
     }
 
+    private String getString(String boostersTable) {
+        String autoInc = isMySQL ? "AUTO_INCREMENT" : "AUTOINCREMENT";
+        return """
+                CREATE TABLE IF NOT EXISTS %s (
+                    id INTEGER PRIMARY KEY %s,
+                    uuid VARCHAR(36) NOT NULL,
+                    booster_id VARCHAR(64) NOT NULL,
+                    multiplier DOUBLE NOT NULL,
+                    profession VARCHAR(64),
+                    is_permanent BOOLEAN NOT NULL,
+                    remaining_time BIGINT NOT NULL,
+                    shared_with TEXT
+                );
+                """.formatted(boostersTable, autoInc);
+    }
+
     public boolean isMySQL() {
-        return plugin.getConfigFile().getString("database.type", "SQLITE").equalsIgnoreCase("MYSQL");
+        return isMySQL;
     }
 
     public String getUsersTable() {

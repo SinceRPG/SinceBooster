@@ -1,6 +1,5 @@
 package net.danh.sincebooster.manager;
 
-
 import net.danh.sincebooster.SinceBooster;
 import net.danh.sincebooster.data.PlayerDataHandler;
 import net.danh.sincebooster.utils.ColorUtils;
@@ -80,7 +79,6 @@ public class ShareManager {
         return names;
     }
 
-    // Helper cho Tab Complete lệnh Leave (Lấy list Owner đang share cho mình)
     public List<String> getOwnersSharingWith(Player receiver) {
         List<String> owners = new ArrayList<>();
         UUID rId = receiver.getUniqueId();
@@ -117,7 +115,7 @@ public class ShareManager {
         return d + "d " + h + "h " + m + "m " + s + "s";
     }
 
-    // --- SHARE BATCH (Dùng cho cả Single và All) ---
+    // --- SHARE ACTIONS ---
     public void sendInviteBatch(Player sender, Player receiver, List<Booster> boosters) {
         if (boosters == null || boosters.isEmpty()) {
             sender.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.no_boosters_to_share")));
@@ -132,9 +130,7 @@ public class ShareManager {
         List<String> displayNames = new ArrayList<>();
 
         for (Booster b : boosters) {
-            // Check Limit
             if (b.getSharedPlayers().size() >= maxShares) continue;
-            // Check Already Shared
             if (b.getSharedPlayers().contains(rId)) continue;
 
             validBoosterIds.add(b.getId());
@@ -146,16 +142,11 @@ public class ShareManager {
             return;
         }
 
-        // Add to Pending
         pendingInvites.putIfAbsent(rId, new HashMap<>());
         Map<UUID, List<String>> senderMap = pendingInvites.get(rId);
-
-        // Check if already invited same list? (Optional, here we overwrite)
         senderMap.put(sId, new ArrayList<>(validBoosterIds));
 
-        // Send Message
         if (validBoosterIds.size() == 1) {
-            // Single Message
             String msgSent = plugin.getMessagesFile().getString("share.invite_sent");
             if (msgSent != null)
                 sender.sendMessage(ColorUtils.parseWithPrefix(msgSent.replace("<target>", receiver.getName()).replace("<booster_display>", displayNames.getFirst()).replace("<time>", "60")));
@@ -163,10 +154,8 @@ public class ShareManager {
             if (msgRec != null)
                 receiver.sendMessage(ColorUtils.parseWithPrefix(msgRec.replace("<player>", sender.getName()).replace("<booster_display>", displayNames.getFirst())));
         } else {
-            // Batch Message
             String separator = plugin.getMessagesFile().getString("share.batch_separator", ", ");
             String listStr = String.join(separator, displayNames);
-
             String msgSent = plugin.getMessagesFile().getString("share.invite_batch_sent");
             if (msgSent != null)
                 sender.sendMessage(ColorUtils.parseWithPrefix(msgSent.replace("<target>", receiver.getName()).replace("<list>", listStr)));
@@ -200,8 +189,6 @@ public class ShareManager {
             sender.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.booster_not_found").replace("<id>", boosterId)));
             return;
         }
-
-        // Single invite reusing batch logic
         sendInviteBatch(sender, receiver, Collections.singletonList(target));
     }
 
@@ -228,6 +215,11 @@ public class ShareManager {
             if (ids.contains(b.getId())) {
                 if (b.getSharedPlayers().size() < maxShares) {
                     b.addSharedPlayer(rId);
+
+                    // [OPTIMIZATION] Update Reverse Cache (Incoming Cache)
+                    // Giúp tính toán Exp O(1)
+                    plugin.getBoosterManager().refreshIncomingCache(b);
+
                     success = true;
                 }
             }
@@ -246,7 +238,6 @@ public class ShareManager {
         }
     }
 
-    // --- KICK & LEAVE ---
     public void kickShare(Player owner, String boosterId, OfflinePlayer target) {
         List<Booster> boosters = plugin.getBoosterManager().getActiveBoosters(owner.getUniqueId());
         if (boosters != null) {
@@ -254,6 +245,10 @@ public class ShareManager {
                 if (b.getId().equalsIgnoreCase(boosterId)) {
                     if (b.getSharedPlayers().contains(target.getUniqueId())) {
                         b.removeSharedPlayer(target.getUniqueId());
+
+                        // [OPTIMIZATION] Remove from Cache
+                        plugin.getBoosterManager().removeFromIncomingCache(b, target.getUniqueId());
+
                         plugin.getPlayerDataHandler().saveData(owner.getUniqueId(), false);
 
                         String targetName = target.getName() != null ? target.getName() : plugin.getMessagesFile().getString("share.unknown_player", "<red>Người chơi không tồn tại");
@@ -285,6 +280,10 @@ public class ShareManager {
             for (Booster b : boosters) {
                 if (b.getSharedPlayers().contains(receiver.getUniqueId())) {
                     b.removeSharedPlayer(receiver.getUniqueId());
+
+                    // [OPTIMIZATION] Remove from Cache
+                    plugin.getBoosterManager().removeFromIncomingCache(b, receiver.getUniqueId());
+
                     leftAny = true;
                 }
             }
