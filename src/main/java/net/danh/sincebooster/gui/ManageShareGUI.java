@@ -39,6 +39,10 @@ public class ManageShareGUI implements Listener {
     }
 
     public void open(Player p, String boosterId) {
+        if (!p.hasPermission("sincebooster.share")) {
+            p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.no_permission")));
+            return;
+        }
         Booster booster = null;
         List<Booster> list = plugin.getBoosterManager().getActiveBoosters(p.getUniqueId());
         if (list != null) {
@@ -109,6 +113,11 @@ public class ManageShareGUI implements Listener {
         if (item == null || item.getType() == Material.AIR) return;
 
         if (item.getType() == Material.PLAYER_HEAD) {
+            if (!p.hasPermission("sincebooster.share")) {
+                p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.no_permission")));
+                p.closeInventory();
+                return;
+            }
             ItemMeta meta = item.getItemMeta();
             if (meta.getPersistentDataContainer().has(targetKey, PersistentDataType.STRING)) {
                 String uuidStr = meta.getPersistentDataContainer().get(targetKey, PersistentDataType.STRING);

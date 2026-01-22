@@ -3,11 +3,11 @@ package net.danh.sincebooster.data;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import net.danh.sincebooster.SinceBooster;
+import net.danh.sincebooster.manager.Booster;
 
 import java.io.File;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
+import java.util.*;
 
 public class DatabaseManager {
 
@@ -81,7 +81,9 @@ public class DatabaseManager {
                         share_rate DOUBLE DEFAULT -1,
                         owner_buff_rate DOUBLE DEFAULT -1,
                         receiver_buff_rate DOUBLE DEFAULT -1,
-                        share_limit INT DEFAULT -1
+                        share_limit INT DEFAULT -1,
+                        offline_share_enabled BOOLEAN DEFAULT 0,
+                        offline_share_rate DOUBLE DEFAULT -1
                     );
                     """.formatted(usersTable);
             stmt.execute(sqlUsers);
@@ -114,6 +116,41 @@ public class DatabaseManager {
                     shared_with TEXT
                 );
                 """.formatted(boostersTable, autoInc);
+    }
+
+    public Map<UUID, List<Booster>> getIncomingOfflineShares(UUID receiverId) {
+        Map<UUID, List<Booster>> result = new HashMap<>();
+        String query = "SELECT b.*, u.offline_share_enabled, u.offline_share_rate FROM " + getBoostersTable() + " b " +
+                "JOIN " + getUsersTable() + " u ON b.uuid = u.uuid " +
+                "WHERE b.shared_with LIKE ? AND u.offline_share_enabled = 1";
+
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(query)) {
+            ps.setString(1, "%" + receiverId.toString() + "%");
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    UUID ownerId = UUID.fromString(rs.getString("uuid"));
+                    // Kiểm tra chính xác UUID trong chuỗi shared_with để tránh trùng lặp chuỗi con
+                    String sharedRaw = rs.getString("shared_with");
+                    if (!Arrays.asList(sharedRaw.split(",")).contains(receiverId.toString())) continue;
+                    double offlineRate = rs.getDouble("offline_share_rate");
+                    Booster b = new Booster(
+                            rs.getString("booster_id"),
+                            rs.getDouble("multiplier"),
+                            rs.getBoolean("is_permanent") ? -1 : System.currentTimeMillis() + rs.getLong("remaining_time"),
+                            rs.getString("profession"),
+                            rs.getBoolean("is_permanent"),
+                            true, ownerId, offlineRate
+                    );
+
+                    // Gán tỷ lệ offline share vào Booster (hoặc xử lý ở ShareManager)
+                    // Ở đây ta chỉ cần trả về Booster, ShareManager sẽ lo phần tính toán
+                    result.computeIfAbsent(ownerId, k -> new ArrayList<>()).add(b);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return result;
     }
 
     public boolean isMySQL() {

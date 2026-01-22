@@ -79,6 +79,10 @@ public class ConfigUtils {
         return config.getBoolean(path);
     }
 
+    public boolean getBoolean(String path, boolean def) {
+        return config.getBoolean(path, def);
+    }
+
     public List<String> getStringList(String path) {
         return config.getStringList(path);
     }

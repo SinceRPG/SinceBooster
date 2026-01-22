@@ -60,6 +60,10 @@ public class ShareGUI implements Listener {
     // --- GUI OPENERS ---
 
     public void openPlayerSelector(Player p) {
+        if (!p.hasPermission("sincebooster.share")) {
+            p.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.no_permission")));
+            return;
+        }
         String titleStr = getMsg().getString("share_gui.player_selector.title", "Chọn người nhận");
         Inventory inv = Bukkit.createInventory(new PlayerSelectorHolder(), 54, ColorUtils.parse(titleStr));
 
@@ -89,6 +93,10 @@ public class ShareGUI implements Listener {
     }
 
     public void openBoosterSelector(Player p, Player target) {
+        if (!p.hasPermission("sincebooster.share")) {
+            p.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.no_permission")));
+            return;
+        }
         String titleStr = getMsg().getString("share_gui.booster_selector.title", "Chọn Booster");
         Inventory inv = Bukkit.createInventory(new BoosterSelectorHolder(target), 54, ColorUtils.parse(titleStr));
 

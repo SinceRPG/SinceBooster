@@ -13,27 +13,42 @@ public class Booster {
     private final String profession;
     private final boolean permanent;
     private final Set<UUID> sharedPlayers = ConcurrentHashMap.newKeySet();
-    private long endTime;
     private UUID ownerUUID;
+    private long endTime;
+    private double cachedOfflineRate;
 
-    // Constructor cho tạo mới
-    public Booster(String id, double multiplier, long durationSeconds, @Nullable String profession, boolean permanent) {
+    // Constructor 1: Tạo mới (In-game) -> Không cần cache rate (để -1)
+    public Booster(String id, double multiplier, long durationSeconds, @Nullable String profession, boolean permanent, UUID ownerUUID) {
         this.id = id;
         this.multiplier = multiplier;
         this.profession = profession;
         this.permanent = permanent;
+        this.ownerUUID = ownerUUID;
         this.endTime = permanent ? -1 : System.currentTimeMillis() + (durationSeconds * 1000);
+        this.cachedOfflineRate = -1.0;
     }
 
-    // Constructor cho loading từ DB
-    public Booster(String id, double multiplier, long endTime, @Nullable String profession, boolean permanent, boolean isLoad) {
+    // Constructor 2: Load từ DB (Cần thêm tham số cachedOfflineRate)
+    public Booster(String id, double multiplier, long endTime, @Nullable String profession, boolean permanent, boolean isLoad, UUID ownerUUID, double cachedOfflineRate) {
         this.id = id;
         this.multiplier = multiplier;
         this.endTime = endTime;
         this.profession = profession;
         this.permanent = permanent;
+        this.ownerUUID = ownerUUID;
+        this.cachedOfflineRate = cachedOfflineRate; // Lưu giá trị cache
     }
 
+    // [MỚI] Getter
+    public double getCachedOfflineRate() {
+        return cachedOfflineRate;
+    }
+
+    public void setCachedOfflineRate(double rate) {
+        this.cachedOfflineRate = rate;
+    }
+
+    // ... (Giữ nguyên các method cũ: getOwnerUUID, reduceTime, isValid, v.v...) ...
     public UUID getOwnerUUID() {
         return ownerUUID;
     }
@@ -89,6 +104,7 @@ public class Booster {
         return permanent;
     }
 
+    // ... (Equals & HashCode giữ nguyên) ...
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -99,7 +115,7 @@ public class Booster {
                 endTime == booster.endTime &&
                 Objects.equals(id, booster.id) &&
                 Objects.equals(profession, booster.profession) &&
-                Objects.equals(ownerUUID, booster.ownerUUID); // Thêm check owner
+                Objects.equals(ownerUUID, booster.ownerUUID);
     }
 
     @Override

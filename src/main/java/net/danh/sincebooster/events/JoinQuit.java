@@ -1,10 +1,15 @@
 package net.danh.sincebooster.events;
 
 import net.danh.sincebooster.SinceBooster;
+import net.danh.sincebooster.manager.Booster;
+import org.bukkit.Bukkit;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+
+import java.util.List;
+import java.util.UUID;
 
 public class JoinQuit implements Listener {
     private final SinceBooster plugin;
@@ -16,10 +21,29 @@ public class JoinQuit implements Listener {
     @EventHandler
     public void onJoin(PlayerJoinEvent e) {
         plugin.getPlayerDataHandler().loadData(e.getPlayer());
+
+        plugin.getBoosterManager().getShareManager().updateOfflineSharesOnJoin(e.getPlayer());
     }
 
     @EventHandler
     public void onQuit(PlayerQuitEvent e) {
-        plugin.getPlayerDataHandler().saveData(e.getPlayer().getUniqueId(), true);
+        UUID quitUUID = e.getPlayer().getUniqueId();
+        plugin.getPlayerDataHandler().saveData(quitUUID, true);
+
+        // Dọn dẹp RAM: Kiểm tra xem còn ai online nhận booster của những người offline không
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            plugin.getBoosterManager().getActiveBoosters().keySet().removeIf(ownerId -> {
+                // Nếu chủ đang online thì không xóa
+                if (Bukkit.getPlayer(ownerId) != null) return false;
+
+                // Nếu không còn ai online được share booster của người này -> Xóa khỏi RAM
+                boolean stillNeeded = Bukkit.getOnlinePlayers().stream().anyMatch(onlineP -> {
+                    List<Booster> boosters = plugin.getBoosterManager().getActiveBoosters(ownerId);
+                    return boosters != null && boosters.stream().anyMatch(b -> b.getSharedPlayers().contains(onlineP.getUniqueId()));
+                });
+
+                return !stillNeeded;
+            });
+        }, 40L); // Chờ 2 giây sau khi quit để dọn dẹp
     }
 }

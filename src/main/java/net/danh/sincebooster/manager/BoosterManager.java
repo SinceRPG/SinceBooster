@@ -99,7 +99,7 @@ public class BoosterManager {
         }
 
         if (!extended) {
-            Booster newBooster = new Booster(finalId, multiplier, seconds, finalProf, isPermanent);
+            Booster newBooster = new Booster(finalId, multiplier, seconds, finalProf, isPermanent, uuid);
             list.add(newBooster);
             if (isPermanent) sendMsg(p, "booster.receive.permanent", finalId, multiplier, 0);
             else sendMsg(p, "booster.receive.duration", finalId, multiplier, seconds);
@@ -117,67 +117,45 @@ public class BoosterManager {
         List<Booster> myList = activeBoosters.get(myUUID);
         if (myList != null) {
             for (Booster b : myList) {
-                if (!b.isValid()) {
-                    myList.remove(b);
-                    // Cleanup cache
-                    for (UUID receiver : b.getSharedPlayers()) removeFromIncomingCache(b, receiver);
-                    if (p.isOnline()) sendMsg(p, "booster.expired", b.getId(), 0, 0);
-                    continue;
-                }
-
+                if (!b.isValid()) continue; // (Đoạn cleanup giữ nguyên)
                 if (checkProf(b, targetProf)) {
-                    double bonus = b.getMultiplier() - 1.0;
-                    if (b.isPermanent() && !b.getSharedPlayers().isEmpty()) {
-                        bonus *= shareManager.getOwnerBuffRate(myUUID);
-                    }
-                    totalAdded += bonus;
+                    // GỌI HÀM CHUẨN
+                    double finalMult = shareManager.getFinalMultiplier(b, myUUID);
+                    totalAdded += (finalMult - 1.0);
                 }
             }
         }
 
-        // 2. BOOSTER ĐƯỢC SHARE (Đã tối ưu O(1) Lookup)
+        // 2. BOOSTER ĐƯỢC SHARE
         Set<Booster> sharedWithMe = incomingShares.get(myUUID);
         if (sharedWithMe != null) {
-            // Dùng Iterator để có thể remove an toàn nếu expired
-            Iterator<Booster> it = sharedWithMe.iterator();
-            while (it.hasNext()) {
-                Booster b = it.next();
-
-                // Double check valid (phòng trường hợp owner offline hoặc hết hạn mà task chưa quét)
-                if (!b.isValid()) {
-                    it.remove();
-                    continue;
-                }
-
-                // Double check xem mình còn trong list share của booster đó không
-                if (!b.getSharedPlayers().contains(myUUID)) {
-                    it.remove();
-                    continue;
-                }
+            for (Booster b : sharedWithMe) {
+                if (!b.isValid()) continue;
+                if (!b.getSharedPlayers().contains(myUUID)) continue;
 
                 if (checkProf(b, targetProf)) {
-                    double bonus = b.getMultiplier() - 1.0;
-                    if (b.isPermanent()) {
-                        // Cần tìm owner của Booster này để lấy Rate của họ?
-                        // Booster class chưa lưu owner UUID field, nhưng ta có thể tìm cách khác hoặc chấp nhận global/cached.
-                        // Ở đây logic cũ dùng UUID của owner.
-                        // [FIX] Để tối ưu, Booster nên biết ai là chủ.
-                        // Tạm thời giả định hệ thống lấy rate người nhận (theo logic cũ: receiverBuffRate(ownerUUID))
-                        // Vì Booster không lưu Owner UUID, ta cần map ngược hoặc lưu owner vào Booster.
-                        // -> Giải pháp nhanh: Logic cũ dùng loop để biết owner.
-                        // -> Giải pháp tối ưu: Ở đây ta chấp nhận lấy Rate của "Mình" hoặc Global nếu không muốn sửa class Booster quá nhiều.
-                        // Nhưng để giữ đúng logic cũ:
-                        // bonus *= shareManager.getReceiverBuffRate(ownerUUID);
-
-                        // Để fix triệt để mà không loop, tôi sẽ thêm field `ownerUUID` vào Class Booster (xem bên dưới).
-                        bonus *= shareManager.getReceiverBuffRate(b.getOwnerUUID());
-                    }
-                    totalAdded += bonus;
+                    // GỌI HÀM CHUẨN
+                    double finalMult = shareManager.getFinalMultiplier(b, myUUID);
+                    totalAdded += (finalMult - 1.0);
                 }
             }
         }
 
         return 1.0 + totalAdded;
+    }
+
+    public void loadExternalBoosters(UUID ownerId, List<Booster> boosters) {
+        if (activeBoosters.containsKey(ownerId)) return; // Đã có trong bộ nhớ thì thôi
+
+        List<Booster> safeList = new CopyOnWriteArrayList<>(boosters);
+        activeBoosters.put(ownerId, safeList);
+
+        for (Booster b : safeList) {
+            refreshIncomingCache(b);
+        }
+
+        // Log để kiểm tra
+        plugin.getLogger().info("Đã nạp tạm thời " + boosters.size() + " boosters của " + ownerId + " để xử lý chia sẻ offline.");
     }
 
     private boolean checkProf(Booster b, String targetProf) {
@@ -246,5 +224,13 @@ public class BoosterManager {
         for (Booster b : copy) {
             removeBooster(target, b.getId());
         }
+    }
+
+    public Map<UUID, List<Booster>> getActiveBoosters() {
+        return activeBoosters;
+    }
+
+    public Map<UUID, Set<Booster>> getIncomingShares() {
+        return incomingShares;
     }
 }

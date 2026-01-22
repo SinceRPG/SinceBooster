@@ -248,11 +248,43 @@ public final class SinceBooster extends JavaPlugin {
                             )
                     )
                     .then(Commands.literal("share")
+                            .then(Commands.literal("offline")
+                                    .executes(ctx -> {
+                                        Player p = (Player) ctx.getSource().getExecutor();
+                                        if (p == null) return 0;
+
+                                        // Check quyền Offline Share
+                                        if (!(p.hasPermission("sincebooster.share.offline") && p.hasPermission("sincebooster.share"))) {
+                                            p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.offline_no_perm")));
+                                            return 0;
+                                        }
+
+                                        PlayerDataHandler.PlayerSession session = playerDataHandler.getSession(p.getUniqueId());
+                                        if (session != null) {
+                                            boolean current = session.isOfflineShareEnabled();
+                                            session.setOfflineShareEnabled(!current); // Đảo ngược trạng thái
+
+                                            // Lưu ngay lập tức để tránh mất dữ liệu
+                                            playerDataHandler.saveData(p.getUniqueId(), false);
+
+                                            if (!current) { // Mới bật lên (vì !current là trạng thái mới)
+                                                p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.offline_toggle_on")));
+                                            } else {
+                                                p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.offline_toggle_off")));
+                                            }
+                                        }
+                                        return 1;
+                                    })
+                            )
                             .then(Commands.argument("target", StringArgumentType.word())
                                     .suggests((ctx, builder) -> suggestPlayers(builder))
                                     .then(Commands.literal("all").executes(ctx -> {
                                         Player p = (Player) ctx.getSource().getExecutor();
                                         Player t = Bukkit.getPlayer(StringArgumentType.getString(ctx, "target"));
+                                        if (p != null && !p.hasPermission("sincebooster.share")) {
+                                            p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.no_permission")));
+                                            return 0;
+                                        }
                                         if (validateShare(p, t)) {
                                             List<Booster> list = boosterManager.getActiveBoosters(Objects.requireNonNull(p).getUniqueId());
                                             boosterManager.getShareManager().sendInviteBatch(p, t, list);
@@ -271,6 +303,10 @@ public final class SinceBooster extends JavaPlugin {
                                                 Player p = (Player) ctx.getSource().getExecutor();
                                                 Player t = Bukkit.getPlayer(StringArgumentType.getString(ctx, "target"));
                                                 String bId = StringArgumentType.getString(ctx, "booster_id");
+                                                if (p != null && !p.hasPermission("sincebooster.share")) {
+                                                    p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.no_permission")));
+                                                    return 0;
+                                                }
                                                 if (validateShare(p, t)) {
                                                     boosterManager.getShareManager().sendInvite(Objects.requireNonNull(p), t, bId);
                                                 }
@@ -479,5 +515,9 @@ public final class SinceBooster extends JavaPlugin {
 
     public ConfigUtils getConfigFile() {
         return configFile;
+    }
+
+    public BoosterGUI getBoosterGUI() {
+        return boosterGUI;
     }
 }

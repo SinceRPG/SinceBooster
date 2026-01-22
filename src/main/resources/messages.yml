@@ -43,6 +43,12 @@ share:
   leave_success: "&aĐã hủy dùng chung các Booster từ &b<owner>&a."
   leave_owner_notify: "&e<player> &ađã tự rời khỏi danh sách chia sẻ của bạn."
   not_sharing_with_owner: "&cBạn đang không dùng chung Booster nào từ người này."
+  no_permission: "&cBạn không có quyền sử dụng tính năng chia sẻ Booster (sincebooster.share)."
+  offline_share_active: "&7(Offline Share: &aBật&7)"
+  offline_share_inactive: "&7(Offline Share: &cTắt&7)"
+  offline_toggle_on: "&aĐã &2BẬT &atính năng chia sẻ khi Offline."
+  offline_toggle_off: "&cĐã &4TẮT &ctính năng chia sẻ khi Offline."
+  offline_no_perm: "&cBạn không có quyền sử dụng tính năng chia sẻ khi Offline (sincebooster.share.offline)."
 
 booster:
   receive:
@@ -53,7 +59,8 @@ booster:
 
   gui:
     title: "&0Danh Sách Booster"
-    closed_on_reload: "&cGUI đã đóng do admin reload plugin."
+    action_cooldown: "&c&lVui lòng thao tác chậm lại!"
+    closed_on_reload: "&cMenu đã đóng do server reload."
 
     # Định dạng thời gian
     formats:
@@ -69,6 +76,36 @@ booster:
         - "&7và chia sẻ hiệu quả Booster."
         - ""
         - "&bClick để mở menu!"
+    # [MỚI] Nút Bật/Tắt Offline Share
+    offline_toggle_button:
+      slot: 50
+      # Trạng thái khi ĐANG BẬT -> Click để Tắt
+      enabled:
+        name: "&aShare Offline: &2ĐANG BẬT"
+        material: "LIME_DYE"
+        lore:
+          - "&7Booster vẫn sẽ hoạt động cho"
+          - "&7người được share khi bạn Offline."
+          - ""
+          - "&eClick để TẮT tính năng này."
+      # Trạng thái khi ĐANG TẮT -> Click để Bật
+      disabled:
+        name: "&cShare Offline: &4ĐANG TẮT"
+        material: "GRAY_DYE"
+        lore:
+          - "&7Booster sẽ ngừng tác dụng"
+          - "&7với người nhận khi bạn Offline."
+          - ""
+          - "&eClick để BẬT tính năng này."
+      # Trạng thái khi KHÔNG CÓ QUYỀN
+      no_perm:
+        name: "&7Share Offline: &cKhóa"
+        material: "BARRIER"
+        lore:
+          - "&7Bạn không có quyền sử dụng"
+          - "&7tính năng chia sẻ khi Offline."
+          - ""
+          - "&cYêu cầu: sincebooster.share.offline"
 
     # Item hiển thị Booster
     item:
