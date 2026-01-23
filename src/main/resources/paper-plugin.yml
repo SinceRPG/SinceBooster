@@ -3,6 +3,7 @@ version: '1.0'
 main: net.danh.sincebooster.SinceBooster
 api-version: '1.21'
 authors: [ VoChiDanh ]
+website: https://gitlab.com/sincerpg/SinceBooster
 dependencies:
   server:
     MythicLib:
