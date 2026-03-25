@@ -110,6 +110,7 @@ public class ManageShareGUI implements Listener {
         if (!(e.getInventory().getHolder() instanceof ManageHolder holder)) return;
 
         e.setCancelled(true);
+        if (e.getClickedInventory() != e.getView().getTopInventory()) return;
         ItemStack item = e.getCurrentItem();
         if (item == null || item.getType() == Material.AIR) return;
 
@@ -140,7 +141,6 @@ public class ManageShareGUI implements Listener {
         }
     }
 
-    // Chặn kéo thả item vào ManageShareGUI
     @EventHandler
     public void onDrag(InventoryDragEvent e) {
         if (e.getInventory().getHolder() instanceof ManageHolder) {

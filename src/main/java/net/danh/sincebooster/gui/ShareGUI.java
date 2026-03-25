@@ -23,6 +23,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 public class ShareGUI implements Listener {
 
@@ -79,7 +80,7 @@ public class ShareGUI implements Listener {
             return;
         }
         String titleStr = getMsg().getString("share_gui.booster_selector.title", "Chọn Booster");
-        Inventory inv = Bukkit.createInventory(new BoosterSelectorHolder(target), 54, ColorUtils.parse(titleStr));
+        Inventory inv = Bukkit.createInventory(new BoosterSelectorHolder(target.getUniqueId()), 54, ColorUtils.parse(titleStr));
 
         List<Booster> boosters = plugin.getBoosterManager().getActiveBoosters(p.getUniqueId());
         if (boosters != null) {
@@ -169,7 +170,7 @@ public class ShareGUI implements Listener {
 
         InventoryHolder holder = e.getInventory().getHolder();
 
-        // 1. Player Selector (Loại bỏ kiểm tra title)
+        // 1. Player Selector
         if (holder instanceof PlayerSelectorHolder) {
             e.setCancelled(true);
             ItemStack item = e.getCurrentItem();
@@ -186,13 +187,13 @@ public class ShareGUI implements Listener {
                 if (meta.getOwningPlayer() != null && meta.getOwningPlayer().isOnline()) {
                     openBoosterSelector(p, meta.getOwningPlayer().getPlayer());
                 } else {
-                    p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.invalid_target")));
+                    p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.invalid_target", "&cNgười chơi không còn trực tuyến!")));
                     p.closeInventory();
                 }
             }
         }
-        // 2. Booster Selector (Loại bỏ kiểm tra title)
-        else if (holder instanceof BoosterSelectorHolder(Player target)) {
+        // 2. Booster Selector
+        else if (holder instanceof BoosterSelectorHolder(UUID targetUUID)) {
             e.setCancelled(true);
             ItemStack item = e.getCurrentItem();
             if (item == null || item.getType() == Material.AIR) return;
@@ -206,12 +207,17 @@ public class ShareGUI implements Listener {
             String bId = getBoosterIdFromItem(item);
             if (bId == null) return;
 
-            plugin.getBoosterManager().getShareManager().sendInvite(p, target, bId);
+            Player target = Bukkit.getPlayer(targetUUID);
+            if (target != null) {
+                plugin.getBoosterManager().getShareManager().sendInvite(p, target, bId);
+            } else {
+                p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.invalid_target", "&cNgười chơi không còn trực tuyến!")));
+            }
+
             p.closeInventory();
         }
     }
 
-    // Chặn kéo thả item vào ShareGUI
     @EventHandler
     public void onDrag(InventoryDragEvent e) {
         InventoryHolder holder = e.getInventory().getHolder();
@@ -251,7 +257,7 @@ public class ShareGUI implements Listener {
         }
     }
 
-    public record BoosterSelectorHolder(Player target) implements InventoryHolder {
+    public record BoosterSelectorHolder(UUID targetUUID) implements InventoryHolder {
         @Override
         public @Nullable Inventory getInventory() {
             return null;
