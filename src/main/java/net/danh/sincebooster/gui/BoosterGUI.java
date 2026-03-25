@@ -6,7 +6,6 @@ import net.danh.sincebooster.manager.Booster;
 import net.danh.sincebooster.utils.ColorUtils;
 import net.danh.sincebooster.utils.ConfigUtils;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -58,12 +57,10 @@ public class BoosterGUI implements Listener {
         }.runTaskTimer(plugin, 20L, 20L);
     }
 
-    // View self
     public void open(Player p) {
         open(p, p);
     }
 
-    // View other (Admin)
     public void open(Player viewer, Player target) {
         String titleStr;
         if (viewer.getUniqueId().equals(target.getUniqueId())) {
@@ -80,7 +77,6 @@ public class BoosterGUI implements Listener {
     private void updateContent(Inventory inv, UUID targetUUID, Player viewer) {
         List<DisplayBooster> displayList = new ArrayList<>();
 
-        // 1. Target's Own Boosters
         List<Booster> ownList = plugin.getBoosterManager().getActiveBoosters(targetUUID);
         if (ownList != null) {
             for (Booster b : ownList) {
@@ -89,16 +85,14 @@ public class BoosterGUI implements Listener {
             }
         }
 
-        // 2. Target's Received Boosters (Quét dữ liệu đã nạp trong RAM)
         for (Map.Entry<UUID, List<Booster>> entry : plugin.getBoosterManager().getActiveBoosters().entrySet()) {
             UUID ownerUUID = entry.getKey();
-            if (ownerUUID.equals(targetUUID)) continue; // Bỏ qua nếu là chính mình
+            if (ownerUUID.equals(targetUUID)) continue;
 
             List<Booster> otherList = entry.getValue();
             if (otherList != null) {
                 for (Booster b : otherList) {
                     if (b.isValid() && b.getSharedPlayers().contains(targetUUID)) {
-                        // Lấy tên: Ưu tiên Online, nếu không thì lấy tên từ cache OfflinePlayer
                         Player onlineOwner = Bukkit.getPlayer(ownerUUID);
                         String ownerName;
                         if (onlineOwner != null) {
@@ -107,20 +101,16 @@ public class BoosterGUI implements Listener {
                             OfflinePlayer offP = Bukkit.getOfflinePlayer(ownerUUID);
                             ownerName = (offP.getName() != null) ? offP.getName() : ownerUUID.toString().substring(0, 8);
                         }
-
                         displayList.add(new DisplayBooster(b, false, ownerName, ownerUUID));
                     }
                 }
             }
         }
 
-        // [THÊM MỚI] 3. Target's Received Boosters (FROM OFFLINE PLAYERS)
         Map<UUID, List<Booster>> offlineShares = plugin.getBoosterManager().getShareManager().getCachedOfflineShares(targetUUID);
         if (offlineShares != null) {
             for (Map.Entry<UUID, List<Booster>> entry : offlineShares.entrySet()) {
                 UUID ownerUUID = entry.getKey();
-                // Bỏ qua nếu owner đang Online (để tránh trùng lặp với mục 2)
-                // (Mặc dù updateOfflineSharesOnJoin đã xử lý, nhưng check thêm cho chắc chắn)
                 if (Bukkit.getPlayer(ownerUUID) != null) continue;
 
                 List<Booster> boosters = entry.getValue();
@@ -267,25 +257,13 @@ public class BoosterGUI implements Listener {
 
                 line = line.replace("<multiplier>", String.valueOf(b.getMultiplier())).replace("<percent>", String.valueOf((int) ((b.getMultiplier() - 1) * 100))).replace("<decay_rate>", String.format("%.1f", decayRate)).replace("<efficiency>", String.format("%.0f", efficiency)).replace("<shared_count>", String.valueOf(b.getSharedPlayers().size())).replace("<shared_list>", sharedListStr);
             } else {
-                // --- ĐÂY LÀ ĐOẠN TÍNH TOÁN LẠI CHO ĐÚNG ---
                 double baseMult = b.getMultiplier();
-
-                // 1. Lấy Tỷ lệ chính xác (Rate)
-                // Hàm này sẽ trả về 0.25 (Offline) hoặc 1.0 (Online) tùy tình trạng thực tế
-                // Quan trọng: Dùng viewerUUID làm người nhận để tính đúng cho người đang xem
                 double currentRate = plugin.getBoosterManager().getShareManager().getReceiverMultiplier(b, viewerUUID);
-
-                // 2. Tính Efficiency (Hiệu suất) để hiển thị %
-                // Ví dụ: Rate 0.25 -> Hiển thị 25%
                 double efficiency = currentRate * 100.0;
-
-                // 3. Tính Real Multiplier (Thực nhận)
-                // Công thức: 1 + (Bonus Gốc * Tỷ lệ)
-                // Ví dụ: Gốc x3 (Bonus +2), Rate 0.25 -> Thực nhận: 1 + (2 * 0.25) = 1.5x
                 double realMult = 1.0 + ((baseMult - 1.0) * currentRate);
 
-                line = line.replace("<owner_name>", db.ownerName).replace("<base_multiplier>", String.valueOf(baseMult)).replace("<efficiency>", String.format("%.0f", efficiency)) // Hiển thị 25
-                        .replace("<real_multiplier>", String.format("%.2f", realMult)); // Hiển thị 1.50
+                line = line.replace("<owner_name>", db.ownerName).replace("<base_multiplier>", String.valueOf(baseMult)).replace("<efficiency>", String.format("%.0f", efficiency))
+                        .replace("<real_multiplier>", String.format("%.2f", realMult));
             }
 
             if (line.contains("\n")) {
@@ -410,15 +388,6 @@ public class BoosterGUI implements Listener {
         return format.replace("<day>", String.valueOf(days)).replace("<hour>", String.valueOf(hours)).replace("<min>", String.valueOf(minutes)).replace("<sec>", String.valueOf(secs));
     }
 
-    public boolean isBoosterGUI(Component viewTitle) {
-        String configTitleStr = getMsg().getString("booster.gui.title", "Danh Sách Booster");
-        Component configTitle = ColorUtils.parse(configTitleStr);
-        if (viewTitle.equals(configTitle)) return true;
-        String viewPlain = PlainTextComponentSerializer.plainText().serialize(viewTitle);
-        String configPlain = PlainTextComponentSerializer.plainText().serialize(configTitle);
-        return viewPlain.equals(configPlain);
-    }
-
     private ItemStack createOfflineToggleItem(Player p) {
         boolean hasPerm = p.hasPermission("sincebooster.share.offline");
         boolean isEnabled = false;
@@ -434,7 +403,6 @@ public class BoosterGUI implements Listener {
 
         String basePath = "booster.gui.offline_toggle_button." + stateKey;
 
-        // Fallback safety
         String matName = getMsg().getString(basePath + ".material", "BARRIER");
         Material mat;
         try {
@@ -485,14 +453,12 @@ public class BoosterGUI implements Listener {
                 return;
             }
 
-            // [MỚI] Xử lý click Toggle Offline với Cooldown
             if (slot == toggleSlot && isSelfView) {
                 if (!p.hasPermission("sincebooster.share.offline")) {
                     p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.offline_no_perm")));
                     return;
                 }
 
-                // --- COOLDOWN CHECK (UPDATED: PersistentDataContainer) ---
                 if (p.getPersistentDataContainer().has(cooldownKey, PersistentDataType.LONG)) {
                     Long lastClick = p.getPersistentDataContainer().get(cooldownKey, PersistentDataType.LONG);
                     if (lastClick != null && System.currentTimeMillis() - lastClick < 2000) {
@@ -501,14 +467,12 @@ public class BoosterGUI implements Listener {
                     }
                 }
                 p.getPersistentDataContainer().set(cooldownKey, PersistentDataType.LONG, System.currentTimeMillis());
-                // ----------------------
 
                 PlayerDataHandler.PlayerSession session = plugin.getPlayerDataHandler().getSession(p.getUniqueId());
                 if (session != null) {
                     boolean current = session.isOfflineShareEnabled();
                     session.setOfflineShareEnabled(!current);
 
-                    // Lưu dữ liệu
                     plugin.getPlayerDataHandler().saveData(p.getUniqueId(), false);
 
                     if (!current)
@@ -577,7 +541,6 @@ public class BoosterGUI implements Listener {
     }
 
     public record BoosterHolder(UUID targetUUID) implements InventoryHolder {
-
         @Override
         public @Nullable Inventory getInventory() {
             return null;

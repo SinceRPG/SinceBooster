@@ -22,6 +22,8 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.jspecify.annotations.NonNull;
@@ -98,7 +100,15 @@ public final class SinceBooster extends JavaPlugin {
 
     public void reloadFiles() {
         for (Player p : Bukkit.getOnlinePlayers()) {
-            if (boosterGUI.isBoosterGUI(p.getOpenInventory().title())) {
+            Inventory topInv = p.getOpenInventory().getTopInventory();
+            InventoryHolder holder = topInv.getHolder();
+
+            // Đóng GUI dựa trên InventoryHolder thay vì Title để tránh xung đột
+            if (holder instanceof BoosterGUI.BoosterHolder ||
+                    holder instanceof ShareGUI.PlayerSelectorHolder ||
+                    holder instanceof ShareGUI.BoosterSelectorHolder ||
+                    holder instanceof ManageShareGUI.ManageHolder) {
+
                 p.closeInventory();
                 p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("booster.gui.closed_on_reload")));
             }
@@ -150,7 +160,7 @@ public final class SinceBooster extends JavaPlugin {
                             )
                     )
                     // ==========================================
-                    //           NEW COMMAND: REMOVE
+                    //            NEW COMMAND: REMOVE
                     // ==========================================
                     .then(Commands.literal("remove")
                             .requires(s -> s.getSender().hasPermission("sincebooster.admin"))
@@ -158,16 +168,11 @@ public final class SinceBooster extends JavaPlugin {
                                     .suggests((ctx, builder) -> suggestPlayers(builder))
                                     .then(Commands.argument("booster_id", StringArgumentType.word())
                                             .suggests((ctx, builder) -> {
-                                                // 1. Luôn gợi ý 'all'
                                                 builder.suggest("all");
-
-                                                // 2. Lấy tên người chơi từ tham số "target" phía trước
                                                 try {
                                                     String tName = StringArgumentType.getString(ctx, "target");
                                                     Player t = Bukkit.getPlayer(tName);
-
                                                     if (t != null) {
-                                                        // 3. Lấy danh sách booster thực tế của người đó để gợi ý
                                                         List<Booster> list = boosterManager.getActiveBoosters(t.getUniqueId());
                                                         if (list != null) {
                                                             for (Booster b : list) {
@@ -176,7 +181,6 @@ public final class SinceBooster extends JavaPlugin {
                                                         }
                                                     }
                                                 } catch (IllegalArgumentException ignored) {
-                                                    // Bỏ qua lỗi nếu Brigadier chưa parse xong arg trước đó (lúc đang gõ dở)
                                                 }
                                                 return builder.buildFuture();
                                             })
@@ -263,11 +267,9 @@ public final class SinceBooster extends JavaPlugin {
                                         if (session != null) {
                                             boolean current = session.isOfflineShareEnabled();
                                             session.setOfflineShareEnabled(!current); // Đảo ngược trạng thái
-
-                                            // Lưu ngay lập tức để tránh mất dữ liệu
                                             playerDataHandler.saveData(p.getUniqueId(), false);
 
-                                            if (!current) { // Mới bật lên (vì !current là trạng thái mới)
+                                            if (!current) {
                                                 p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.offline_toggle_on")));
                                             } else {
                                                 p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.offline_toggle_off")));

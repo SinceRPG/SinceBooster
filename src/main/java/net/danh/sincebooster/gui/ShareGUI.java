@@ -5,7 +5,6 @@ import net.danh.sincebooster.manager.Booster;
 import net.danh.sincebooster.utils.ColorUtils;
 import net.danh.sincebooster.utils.ConfigUtils;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -13,6 +12,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
@@ -36,25 +36,6 @@ public class ShareGUI implements Listener {
 
     private ConfigUtils getMsg() {
         return plugin.getMessagesFile();
-    }
-
-    // --- HELPER METHODS ---
-    public boolean isPlayerSelector(Component viewTitle) {
-        String configTitleStr = getMsg().getString("share_gui.player_selector.title", "Chọn người nhận");
-        Component configTitle = ColorUtils.parse(configTitleStr);
-        if (viewTitle.equals(configTitle)) return true;
-        String viewPlain = PlainTextComponentSerializer.plainText().serialize(viewTitle);
-        String configPlain = PlainTextComponentSerializer.plainText().serialize(configTitle);
-        return viewPlain.equals(configPlain);
-    }
-
-    public boolean isBoosterSelector(Component viewTitle) {
-        String configTitleStr = getMsg().getString("share_gui.booster_selector.title", "Chọn Booster");
-        Component configTitle = ColorUtils.parse(configTitleStr);
-        if (viewTitle.equals(configTitle)) return true;
-        String viewPlain = PlainTextComponentSerializer.plainText().serialize(viewTitle);
-        String configPlain = PlainTextComponentSerializer.plainText().serialize(configTitle);
-        return viewPlain.equals(configPlain);
     }
 
     // --- GUI OPENERS ---
@@ -122,10 +103,8 @@ public class ShareGUI implements Listener {
         ItemStack item = new ItemStack(mat);
         ItemMeta meta = item.getItemMeta();
 
-        // 1. Lưu Booster ID vào item để xử lý khi click
         meta.getPersistentDataContainer().set(boosterIdKey, PersistentDataType.STRING, b.getId());
 
-        // 2. Xác định tên và key
         String keyDur = b.isPermanent() ? "name_perm" : "name_time";
         String basePath = "share_gui.booster_selector.item.";
 
@@ -142,19 +121,11 @@ public class ShareGUI implements Listener {
         String typeColor = (b.getProfession() == null) ? "<aqua>" : "<green>";
         String typeName = (b.getProfession() == null) ? "Class XP" : "Job: " + b.getProfession().toUpperCase();
 
-        // 3. Tính toán chỉ số cho người nhận
         double baseMult = b.getMultiplier();
-        double recEfficiency;
-
-        // Lấy thông số efficiency từ ShareManager (Giả sử bạn có method này, nếu không thì mặc định 100 hoặc lấy từ PlayerSession)
-        // Đây là efficiency của người CHIA SẺ, nhưng ta cần hiển thị người NHẬN sẽ nhận được bao nhiêu
-        // Mặc định lấy efficiency của chính người xem (p) hoặc config global
         double receiverRateConfig = plugin.getPlayerDataHandler().getSession(p.getUniqueId()).getReceiverBuffRate();
-        recEfficiency = receiverRateConfig * 100.0;
-
+        double recEfficiency = receiverRateConfig * 100.0;
         double recMult = 1.0 + ((baseMult - 1.0) * (recEfficiency / 100.0));
 
-        // 4. Kiểm tra giới hạn
         int currentShare = b.getSharedPlayers().size();
         boolean isFull = currentShare >= maxShare;
         String slotColor = isFull ? "<red>" : "<green>";
@@ -166,10 +137,8 @@ public class ShareGUI implements Listener {
                     .replace("<type_name>", typeName)
                     .replace("<multiplier>", String.valueOf(baseMult))
                     .replace("<percent>", String.valueOf((int) ((baseMult - 1.0) * 100)))
-
                     .replace("<rec_multiplier>", String.format("%.2f", recMult))
                     .replace("<rec_percent>", String.valueOf((int) ((recMult - 1.0) * 100)))
-
                     .replace("<slot_color>", slotColor)
                     .replace("<status_text>", statusText);
 
@@ -198,11 +167,10 @@ public class ShareGUI implements Listener {
     public void onClick(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
 
-        Component title = e.getView().title();
         InventoryHolder holder = e.getInventory().getHolder();
 
-        // 1. Player Selector
-        if (holder instanceof PlayerSelectorHolder || isPlayerSelector(title)) {
+        // 1. Player Selector (Loại bỏ kiểm tra title)
+        if (holder instanceof PlayerSelectorHolder) {
             e.setCancelled(true);
             ItemStack item = e.getCurrentItem();
             if (item == null || item.getType() == Material.AIR) return;
@@ -223,9 +191,8 @@ public class ShareGUI implements Listener {
                 }
             }
         }
-
-        // 2. Booster Selector
-        else if (holder instanceof BoosterSelectorHolder || isBoosterSelector(title)) {
+        // 2. Booster Selector (Loại bỏ kiểm tra title)
+        else if (holder instanceof BoosterSelectorHolder(Player target)) {
             e.setCancelled(true);
             ItemStack item = e.getCurrentItem();
             if (item == null || item.getType() == Material.AIR) return;
@@ -236,15 +203,20 @@ public class ShareGUI implements Listener {
                 return;
             }
 
-            // Xử lý gửi lời mời
-            if (holder instanceof BoosterSelectorHolder(Player target)) {
-                String bId = getBoosterIdFromItem(item);
-                if (bId == null) return;
+            String bId = getBoosterIdFromItem(item);
+            if (bId == null) return;
 
-                // FIX: Không cần check maxShare ở đây vì sendInvite đã check
-                plugin.getBoosterManager().getShareManager().sendInvite(p, target, bId);
-                p.closeInventory();
-            }
+            plugin.getBoosterManager().getShareManager().sendInvite(p, target, bId);
+            p.closeInventory();
+        }
+    }
+
+    // Chặn kéo thả item vào ShareGUI
+    @EventHandler
+    public void onDrag(InventoryDragEvent e) {
+        InventoryHolder holder = e.getInventory().getHolder();
+        if (holder instanceof PlayerSelectorHolder || holder instanceof BoosterSelectorHolder) {
+            e.setCancelled(true);
         }
     }
 
