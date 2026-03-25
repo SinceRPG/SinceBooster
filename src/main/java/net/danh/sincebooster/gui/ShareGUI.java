@@ -19,7 +19,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.persistence.PersistentDataType;
-import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -47,7 +47,9 @@ public class ShareGUI implements Listener {
             return;
         }
         String titleStr = getMsg().getString("share_gui.player_selector.title", "Chọn người nhận");
-        Inventory inv = Bukkit.createInventory(new PlayerSelectorHolder(), 54, ColorUtils.parse(titleStr));
+        PlayerSelectorHolder holder = new PlayerSelectorHolder();
+        Inventory inv = Bukkit.createInventory(holder, 54, ColorUtils.parse(titleStr));
+        holder.setInventory(inv);
 
         int slot = 0;
         for (Player target : Bukkit.getOnlinePlayers()) {
@@ -80,7 +82,9 @@ public class ShareGUI implements Listener {
             return;
         }
         String titleStr = getMsg().getString("share_gui.booster_selector.title", "Chọn Booster");
-        Inventory inv = Bukkit.createInventory(new BoosterSelectorHolder(target.getUniqueId()), 54, ColorUtils.parse(titleStr));
+        BoosterSelectorHolder holder = new BoosterSelectorHolder(target.getUniqueId());
+        Inventory inv = Bukkit.createInventory(holder, 54, ColorUtils.parse(titleStr));
+        holder.setInventory(inv);
 
         List<Booster> boosters = plugin.getBoosterManager().getActiveBoosters(p.getUniqueId());
         if (boosters != null) {
@@ -193,7 +197,7 @@ public class ShareGUI implements Listener {
             }
         }
         // 2. Booster Selector
-        else if (holder instanceof BoosterSelectorHolder(UUID targetUUID)) {
+        else if (holder instanceof BoosterSelectorHolder bHolder) {
             e.setCancelled(true);
             ItemStack item = e.getCurrentItem();
             if (item == null || item.getType() == Material.AIR) return;
@@ -207,7 +211,7 @@ public class ShareGUI implements Listener {
             String bId = getBoosterIdFromItem(item);
             if (bId == null) return;
 
-            Player target = Bukkit.getPlayer(targetUUID);
+            Player target = Bukkit.getPlayer(bHolder.getTargetUUID());
             if (target != null) {
                 plugin.getBoosterManager().getShareManager().sendInvite(p, target, bId);
             } else {
@@ -251,16 +255,37 @@ public class ShareGUI implements Listener {
 
     // --- HOLDERS ---
     public static class PlayerSelectorHolder implements InventoryHolder {
+        private Inventory inventory;
+
         @Override
-        public @Nullable Inventory getInventory() {
-            return null;
+        public @NotNull Inventory getInventory() {
+            return inventory != null ? inventory : Bukkit.createInventory(null, 9);
+        }
+
+        public void setInventory(Inventory inventory) {
+            this.inventory = inventory;
         }
     }
 
-    public record BoosterSelectorHolder(UUID targetUUID) implements InventoryHolder {
+    public static class BoosterSelectorHolder implements InventoryHolder {
+        private final UUID targetUUID;
+        private Inventory inventory;
+
+        public BoosterSelectorHolder(UUID targetUUID) {
+            this.targetUUID = targetUUID;
+        }
+
+        public UUID getTargetUUID() {
+            return targetUUID;
+        }
+
         @Override
-        public @Nullable Inventory getInventory() {
-            return null;
+        public @NotNull Inventory getInventory() {
+            return inventory != null ? inventory : Bukkit.createInventory(null, 9);
+        }
+
+        public void setInventory(Inventory inventory) {
+            this.inventory = inventory;
         }
     }
 }

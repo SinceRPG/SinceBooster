@@ -21,7 +21,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 
@@ -49,8 +49,8 @@ public class BoosterGUI implements Listener {
             public void run() {
                 for (Player p : Bukkit.getOnlinePlayers()) {
                     Inventory topInv = p.getOpenInventory().getTopInventory();
-                    if (topInv.getHolder() instanceof BoosterHolder(UUID targetUUID)) {
-                        updateContent(topInv, targetUUID, p);
+                    if (topInv.getHolder() instanceof BoosterHolder holder) {
+                        updateContent(topInv, holder.getTargetUUID(), p);
                     }
                 }
             }
@@ -69,7 +69,10 @@ public class BoosterGUI implements Listener {
             titleStr = getMsg().getString("admin.view_title", "Kho: <target>").replace("<target>", target.getName());
         }
 
-        Inventory inv = Bukkit.createInventory(new BoosterHolder(target.getUniqueId()), 54, ColorUtils.parse(titleStr));
+        BoosterHolder holder = new BoosterHolder(target.getUniqueId());
+        Inventory inv = Bukkit.createInventory(holder, 54, ColorUtils.parse(titleStr));
+        holder.setInventory(inv); // Nạp inv vào holder để thỏa mãn @NotNull
+
         updateContent(inv, target.getUniqueId(), viewer);
         viewer.openInventory(inv);
     }
@@ -262,8 +265,7 @@ public class BoosterGUI implements Listener {
                 double efficiency = currentRate * 100.0;
                 double realMult = 1.0 + ((baseMult - 1.0) * currentRate);
 
-                line = line.replace("<owner_name>", db.ownerName).replace("<base_multiplier>", String.valueOf(baseMult)).replace("<efficiency>", String.format("%.0f", efficiency))
-                        .replace("<real_multiplier>", String.format("%.2f", realMult));
+                line = line.replace("<owner_name>", db.ownerName).replace("<base_multiplier>", String.valueOf(baseMult)).replace("<efficiency>", String.format("%.0f", efficiency)).replace("<real_multiplier>", String.format("%.2f", realMult));
             }
 
             if (line.contains("\n")) {
@@ -297,11 +299,7 @@ public class BoosterGUI implements Listener {
         double totalAdd = 0, ownAdd = 0, sharedAdd = 0;
         for (DisplayBooster db : list) {
             if (db.booster.getProfession() == null) {
-                double bonus = db.booster.getMultiplier() - 1.0;
-                if (db.booster.isPermanent() && !db.booster.getSharedPlayers().isEmpty()) {
-                    double rate = db.isOwner ? plugin.getBoosterManager().getShareManager().getOwnerBuffRate(db.ownerUUID) : plugin.getBoosterManager().getShareManager().getReceiverBuffRate(db.ownerUUID);
-                    bonus *= rate;
-                }
+                double bonus = displayBooster(db);
                 totalAdd += bonus;
                 if (db.isOwner) ownAdd += bonus;
                 else sharedAdd += bonus;
@@ -326,11 +324,7 @@ public class BoosterGUI implements Listener {
         for (DisplayBooster db : list) {
             String p = db.booster.getProfession();
             if (p != null) {
-                double bonus = db.booster.getMultiplier() - 1.0;
-                if (db.booster.isPermanent() && !db.booster.getSharedPlayers().isEmpty()) {
-                    double rate = db.isOwner ? plugin.getBoosterManager().getShareManager().getOwnerBuffRate(db.ownerUUID) : plugin.getBoosterManager().getShareManager().getReceiverBuffRate(db.ownerUUID);
-                    bonus *= rate;
-                }
+                double bonus = displayBooster(db);
                 totals.put(p, totals.getOrDefault(p, 0.0) + bonus);
             }
         }
@@ -356,6 +350,15 @@ public class BoosterGUI implements Listener {
         meta.lore(lore);
         item.setItemMeta(meta);
         return item;
+    }
+
+    private double displayBooster(DisplayBooster db) {
+        double bonus = db.booster.getMultiplier() - 1.0;
+        if (db.booster.isPermanent() && !db.booster.getSharedPlayers().isEmpty()) {
+            double rate = db.isOwner ? plugin.getBoosterManager().getShareManager().getOwnerBuffRate(db.ownerUUID) : plugin.getBoosterManager().getShareManager().getReceiverBuffRate(db.ownerUUID);
+            bonus *= rate;
+        }
+        return bonus;
     }
 
     private ItemStack createSeparator() {
@@ -429,9 +432,10 @@ public class BoosterGUI implements Listener {
 
     @EventHandler
     public void onClick(InventoryClickEvent e) {
-        if (!(e.getInventory().getHolder() instanceof BoosterHolder(UUID targetUUID))) return;
+        if (!(e.getInventory().getHolder() instanceof BoosterHolder holder)) return;
 
         e.setCancelled(true);
+        UUID targetUUID = holder.getTargetUUID();
 
         if (e.getClickedInventory() == null || e.getClickedInventory() == e.getView().getTopInventory()) {
             int slot = e.getSlot();
@@ -540,10 +544,25 @@ public class BoosterGUI implements Listener {
         }
     }
 
-    public record BoosterHolder(UUID targetUUID) implements InventoryHolder {
+    public static class BoosterHolder implements InventoryHolder {
+        private final UUID targetUUID;
+        private Inventory inventory;
+
+        public BoosterHolder(UUID targetUUID) {
+            this.targetUUID = targetUUID;
+        }
+
+        public UUID getTargetUUID() {
+            return targetUUID;
+        }
+
         @Override
-        public @Nullable Inventory getInventory() {
-            return null;
+        public @NotNull Inventory getInventory() {
+            return inventory != null ? inventory : Bukkit.createInventory(null, 9);
+        }
+
+        public void setInventory(Inventory inventory) {
+            this.inventory = inventory;
         }
     }
 }

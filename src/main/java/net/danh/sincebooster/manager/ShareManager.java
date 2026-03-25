@@ -39,22 +39,15 @@ public class ShareManager {
         if (!offlineShareEnabled) return;
 
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            // 1. Lấy booster từ DB
             Map<UUID, List<Booster>> shares = plugin.getDatabaseManager().getIncomingOfflineShares(receiver.getUniqueId());
 
             if (!shares.isEmpty()) {
-                // Lưu cache hiển thị GUI
                 offlineSharesCache.put(receiver.getUniqueId(), shares);
 
-                // 2. Chuyển về luồng chính để nạp Session và Booster
-                Bukkit.getScheduler().runTask(plugin, () -> {
-                    shares.keySet().forEach(ownerId -> {
-                        if (Bukkit.getPlayer(ownerId) == null) {
-                            // Nạp ép buộc Session và Booster của người share (Người A)
-                            // Việc này giúp getReceiverMultiplier lấy được tỉ lệ từ sessionMap
-                            plugin.getPlayerDataHandler().forceLoadSession(ownerId);
-                        }
-                    });
+                shares.keySet().forEach(ownerId -> {
+                    if (Bukkit.getPlayer(ownerId) == null) {
+                        plugin.getPlayerDataHandler().forceLoadSession(ownerId);
+                    }
                 });
             }
         });
@@ -64,38 +57,21 @@ public class ShareManager {
         return offlineSharesCache.get(receiverId);
     }
 
-    /**
-     * Hàm trung tâm tính toán Multiplier thực nhận.
-     * Dùng chung cho cả GUI và MMOCoreHook để đảm bảo đồng bộ 100%.
-     *
-     * @param booster      Booster cần tính
-     * @param receiverUUID UUID người đang hưởng thụ (người nhận hoặc chủ sở hữu)
-     * @return Multiplier cuối cùng (VD: 1.25, 1.5, 2.0)
-     */
     public double getFinalMultiplier(Booster booster, UUID receiverUUID) {
-        // 1. Nếu là Chủ sở hữu (Owner)
         if (booster.getOwnerUUID().equals(receiverUUID)) {
             double bonus = booster.getMultiplier() - 1.0;
-            // Nếu đang share cho người khác -> Áp dụng Owner Buff Rate
             if (!booster.getSharedPlayers().isEmpty()) {
                 bonus *= getOwnerBuffRate(receiverUUID);
             }
             return 1.0 + bonus;
         }
 
-        // 2. Nếu là người được Share (Receiver)
         if (booster.getSharedPlayers().contains(receiverUUID)) {
             double baseBonus = booster.getMultiplier() - 1.0;
-
-            // Lấy tỷ lệ nhận (Hàm này đã tự check Online/Offline/Config)
-            // Ví dụ: Online = 1.0, Offline = 0.25 (theo config của bạn)
             double rate = getReceiverMultiplier(booster, receiverUUID);
-
-            // Công thức chuẩn: 1 + (Bonus * Tỷ lệ)
             return 1.0 + (baseBonus * rate);
         }
 
-        // 3. Không liên quan (Không được hưởng)
         return 1.0;
     }
 
@@ -111,20 +87,16 @@ public class ShareManager {
     }
 
     public void updateOfflineSharesOnQuit(Player owner) {
-        // 1. Check quyền và trạng thái bật/tắt
         if (!owner.hasPermission("sincebooster.share.offline")) return;
 
         PlayerDataHandler.PlayerSession session = plugin.getPlayerDataHandler().getSession(owner.getUniqueId());
         if (session == null || !session.isOfflineShareEnabled()) return;
 
-        // 2. Lấy danh sách booster hiện tại
         List<Booster> boosters = plugin.getBoosterManager().getActiveBoosters(owner.getUniqueId());
         if (boosters == null || boosters.isEmpty()) return;
 
-        // Clone list để lưu trữ (vì list gốc trong Manager sẽ bị unload)
         List<Booster> offlineList = new ArrayList<>(boosters);
 
-        // 3. Tìm tất cả người nhận đang Online
         Set<UUID> onlineReceivers = new HashSet<>();
         for (Booster b : offlineList) {
             for (UUID uid : b.getSharedPlayers()) {
@@ -134,7 +106,6 @@ public class ShareManager {
             }
         }
 
-        // 4. Cập nhật Cache cho người nhận
         for (UUID receiverId : onlineReceivers) {
             offlineSharesCache.computeIfAbsent(receiverId, k -> new ConcurrentHashMap<>())
                     .put(owner.getUniqueId(), offlineList);
@@ -153,26 +124,18 @@ public class ShareManager {
         UUID ownerId = b.getOwnerUUID();
         Player owner = Bukkit.getPlayer(ownerId);
 
-        // A. Owner Online -> Lấy từ RAM (Session)
         if (owner != null) {
             PlayerDataHandler.PlayerSession s = plugin.getPlayerDataHandler().getSession(ownerId);
             if (s != null && s.getReceiverBuffRate() >= 0) return s.getReceiverBuffRate();
             return globalReceiverBuff;
-        }
-
-        // B. Owner Offline -> Lấy từ Cache trong Booster (KHÔNG QUERY DB)
-        else if (offlineShareEnabled) {
-            // Kiểm tra cache có sẵn trong Booster không
+        } else if (offlineShareEnabled) {
             if (b.getCachedOfflineRate() >= 0) {
                 return b.getCachedOfflineRate();
             }
-
-            // Nếu cache lỗi (-1), thì fallback về default config (vẫn an toàn hơn query DB)
             return globalOfflineRate;
         }
         return 0.0;
     }
-
 
     public void setGlobalValue(String key, double value) {
         if (key.equals("default-share-limit")) plugin.getConfigFile().set("share." + key, (int) value);
@@ -181,7 +144,6 @@ public class ShareManager {
         reloadConfigValues();
     }
 
-    // --- GETTERS ---
     public double getDecayRate(Player p) {
         PlayerDataHandler.PlayerSession s = plugin.getPlayerDataHandler().getSession(p.getUniqueId());
         if (s != null && s.getShareRate() > 0) return s.getShareRate();
@@ -206,7 +168,6 @@ public class ShareManager {
         return globalShareLimit;
     }
 
-    // --- HELPERS ---
     public List<String> getPendingSenders(Player receiver) {
         List<String> names = new ArrayList<>();
         UUID rId = receiver.getUniqueId();
@@ -224,7 +185,6 @@ public class ShareManager {
         List<String> owners = new ArrayList<>();
         UUID rId = receiver.getUniqueId();
 
-        // 1. Online Owners
         for (Player p : Bukkit.getOnlinePlayers()) {
             if (p.getUniqueId().equals(rId)) continue;
             List<Booster> boosters = plugin.getBoosterManager().getActiveBoosters(p.getUniqueId());
@@ -238,11 +198,10 @@ public class ShareManager {
             }
         }
 
-        // 2. Offline Owners
         if (offlineShareEnabled && offlineSharesCache.containsKey(rId)) {
             Map<UUID, List<Booster>> offlineData = offlineSharesCache.get(rId);
             for (UUID ownerId : offlineData.keySet()) {
-                if (Bukkit.getPlayer(ownerId) == null) { // Chỉ lấy nếu thực sự Offline
+                if (Bukkit.getPlayer(ownerId) == null) {
                     OfflinePlayer op = Bukkit.getOfflinePlayer(ownerId);
                     owners.add(op.getName() != null ? op.getName() : "Unknown (Off)");
                 }
@@ -269,7 +228,6 @@ public class ShareManager {
         return d + "d " + h + "h " + m + "m " + s + "s";
     }
 
-    // --- SHARE ACTIONS ---
     public void sendInviteBatch(Player sender, Player receiver, List<Booster> boosters) {
         if (boosters == null || boosters.isEmpty()) {
             sender.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.no_boosters_to_share")));
@@ -369,11 +327,7 @@ public class ShareManager {
             if (ids.contains(b.getId())) {
                 if (b.getSharedPlayers().size() < maxShares) {
                     b.addSharedPlayer(rId);
-
-                    // [OPTIMIZATION] Update Reverse Cache (Incoming Cache)
-                    // Giúp tính toán Exp O(1)
                     plugin.getBoosterManager().refreshIncomingCache(b);
-
                     success = true;
                 }
             }
@@ -399,10 +353,7 @@ public class ShareManager {
                 if (b.getId().equalsIgnoreCase(boosterId)) {
                     if (b.getSharedPlayers().contains(target.getUniqueId())) {
                         b.removeSharedPlayer(target.getUniqueId());
-
-                        // [OPTIMIZATION] Remove from Cache
                         plugin.getBoosterManager().removeFromIncomingCache(b, target.getUniqueId());
-
                         plugin.getPlayerDataHandler().saveData(owner.getUniqueId(), false);
 
                         String targetName = target.getName() != null ? target.getName() : plugin.getMessagesFile().getString("share.unknown_player", "<red>Người chơi không tồn tại");
@@ -434,10 +385,7 @@ public class ShareManager {
             for (Booster b : boosters) {
                 if (b.getSharedPlayers().contains(receiver.getUniqueId())) {
                     b.removeSharedPlayer(receiver.getUniqueId());
-
-                    // [OPTIMIZATION] Remove from Cache
                     plugin.getBoosterManager().removeFromIncomingCache(b, receiver.getUniqueId());
-
                     leftAny = true;
                 }
             }
@@ -456,9 +404,6 @@ public class ShareManager {
             @Override
             public void run() {
                 for (Player p : Bukkit.getOnlinePlayers()) {
-                    // Logic decay chỉ chạy cho người online
-                    // Booster của người offline không bị trừ thời gian thực (trừ khi server load chunk? Không, booster plugin tính theo time system)
-                    // Nếu muốn booster offline cũng hết hạn, DatabaseManager load lên sẽ tự lọc.
                     List<Booster> boosters = plugin.getBoosterManager().getActiveBoosters(p.getUniqueId());
                     if (boosters == null) continue;
                     double rate = getDecayRate(p);

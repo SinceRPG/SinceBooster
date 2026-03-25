@@ -20,7 +20,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.persistence.PersistentDataType;
-import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -58,7 +58,9 @@ public class ManageShareGUI implements Listener {
         if (booster == null) return;
 
         String title = getMsg().getString("manage_share_gui.title", "Quản lý Share");
-        Inventory inv = Bukkit.createInventory(new ManageHolder(boosterId), 27, ColorUtils.parse(title));
+        ManageHolder holder = new ManageHolder(boosterId);
+        Inventory inv = Bukkit.createInventory(holder, 27, ColorUtils.parse(title));
+        holder.setInventory(inv);
 
         int slot = 0;
         if (booster.getSharedPlayers().isEmpty()) {
@@ -110,7 +112,9 @@ public class ManageShareGUI implements Listener {
         if (!(e.getInventory().getHolder() instanceof ManageHolder holder)) return;
 
         e.setCancelled(true);
+
         if (e.getClickedInventory() != e.getView().getTopInventory()) return;
+
         ItemStack item = e.getCurrentItem();
         if (item == null || item.getType() == Material.AIR) return;
 
@@ -133,10 +137,10 @@ public class ManageShareGUI implements Listener {
                 }
 
                 // KICK logic
-                plugin.getBoosterManager().getShareManager().kickShare(p, holder.boosterId, target);
+                plugin.getBoosterManager().getShareManager().kickShare(p, holder.getBoosterId(), target);
 
                 // Refresh
-                open(p, holder.boosterId);
+                open(p, holder.getBoosterId());
             }
         }
     }
@@ -149,15 +153,24 @@ public class ManageShareGUI implements Listener {
     }
 
     public static class ManageHolder implements InventoryHolder {
-        public final String boosterId;
+        private final String boosterId;
+        private Inventory inventory;
 
         public ManageHolder(String id) {
             this.boosterId = id;
         }
 
+        public String getBoosterId() {
+            return boosterId;
+        }
+
         @Override
-        public @Nullable Inventory getInventory() {
-            return null;
+        public @NotNull Inventory getInventory() {
+            return inventory != null ? inventory : Bukkit.createInventory(null, 9);
+        }
+
+        public void setInventory(Inventory inventory) {
+            this.inventory = inventory;
         }
     }
 }
