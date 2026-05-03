@@ -101,7 +101,8 @@ public final class SinceBooster extends JavaPlugin {
     public void reloadFiles() {
         for (Player p : Bukkit.getOnlinePlayers()) {
             Inventory topInv = p.getOpenInventory().getTopInventory();
-            InventoryHolder holder = topInv.getHolder();
+            // CRITICAL FIX: Use getHolder(false) to prevent expensive block state snapshots
+            InventoryHolder holder = topInv.getHolder(false);
 
             // Đóng GUI dựa trên InventoryHolder thay vì Title để tránh xung đột
             if (holder instanceof BoosterGUI.BoosterHolder ||

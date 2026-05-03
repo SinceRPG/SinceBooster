@@ -171,8 +171,7 @@ public class ShareGUI implements Listener {
     @EventHandler
     public void onClick(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
-
-        InventoryHolder holder = e.getInventory().getHolder();
+        InventoryHolder holder = e.getInventory().getHolder(false);
 
         // 1. Player Selector
         if (holder instanceof PlayerSelectorHolder) {
@@ -224,7 +223,7 @@ public class ShareGUI implements Listener {
 
     @EventHandler
     public void onDrag(InventoryDragEvent e) {
-        InventoryHolder holder = e.getInventory().getHolder();
+        InventoryHolder holder = e.getInventory().getHolder(false);
         if (holder instanceof PlayerSelectorHolder || holder instanceof BoosterSelectorHolder) {
             e.setCancelled(true);
         }

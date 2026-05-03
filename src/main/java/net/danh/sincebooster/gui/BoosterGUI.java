@@ -49,16 +49,13 @@ public class BoosterGUI implements Listener {
             public void run() {
                 for (Player p : Bukkit.getOnlinePlayers()) {
                     Inventory topInv = p.getOpenInventory().getTopInventory();
-                    if (topInv.getHolder() instanceof BoosterHolder holder) {
+                    // CRITICAL FIX: Use getHolder(false)
+                    if (topInv.getHolder(false) instanceof BoosterHolder holder) {
                         updateContent(topInv, holder.getTargetUUID(), p);
                     }
                 }
             }
         }.runTaskTimer(plugin, 20L, 20L);
-    }
-
-    public void open(Player p) {
-        open(p, p);
     }
 
     public void open(Player viewer, Player target) {
@@ -432,7 +429,7 @@ public class BoosterGUI implements Listener {
 
     @EventHandler
     public void onClick(InventoryClickEvent e) {
-        if (!(e.getInventory().getHolder() instanceof BoosterHolder holder)) return;
+        if (!(e.getInventory().getHolder(false) instanceof BoosterHolder holder)) return;
 
         e.setCancelled(true);
         UUID targetUUID = holder.getTargetUUID();
@@ -527,7 +524,7 @@ public class BoosterGUI implements Listener {
 
     @EventHandler
     public void onDrag(InventoryDragEvent e) {
-        if (e.getInventory().getHolder() instanceof BoosterHolder) e.setCancelled(true);
+        if (e.getInventory().getHolder(false) instanceof BoosterHolder) e.setCancelled(true);
     }
 
     private static class DisplayBooster {

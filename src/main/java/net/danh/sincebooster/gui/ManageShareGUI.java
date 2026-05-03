@@ -109,7 +109,7 @@ public class ManageShareGUI implements Listener {
     @EventHandler
     public void onClick(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
-        if (!(e.getInventory().getHolder() instanceof ManageHolder holder)) return;
+        if (!(e.getInventory().getHolder(false) instanceof ManageHolder holder)) return;
 
         e.setCancelled(true);
 
@@ -147,7 +147,7 @@ public class ManageShareGUI implements Listener {
 
     @EventHandler
     public void onDrag(InventoryDragEvent e) {
-        if (e.getInventory().getHolder() instanceof ManageHolder) {
+        if (e.getInventory().getHolder(false) instanceof ManageHolder) {
             e.setCancelled(true);
         }
     }
