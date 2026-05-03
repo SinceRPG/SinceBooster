@@ -39,14 +39,12 @@ public class ShareGUI implements Listener {
         return plugin.getMessagesFile();
     }
 
-    // --- GUI OPENERS ---
-
     public void openPlayerSelector(Player p) {
         if (!p.hasPermission("sincebooster.share")) {
             p.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.no_permission")));
             return;
         }
-        String titleStr = getMsg().getString("share_gui.player_selector.title", "Chọn người nhận");
+        String titleStr = getMsg().getString("share_gui.player_selector.title", "Select a Player");
         PlayerSelectorHolder holder = new PlayerSelectorHolder();
         Inventory inv = Bukkit.createInventory(holder, 54, ColorUtils.parse(titleStr));
         holder.setInventory(inv);
@@ -81,7 +79,7 @@ public class ShareGUI implements Listener {
             p.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.no_permission")));
             return;
         }
-        String titleStr = getMsg().getString("share_gui.booster_selector.title", "Chọn Booster");
+        String titleStr = getMsg().getString("share_gui.booster_selector.title", "Select a Booster");
         BoosterSelectorHolder holder = new BoosterSelectorHolder(target.getUniqueId());
         Inventory inv = Bukkit.createInventory(holder, 54, ColorUtils.parse(titleStr));
         holder.setInventory(inv);
@@ -173,7 +171,6 @@ public class ShareGUI implements Listener {
         if (!(e.getWhoClicked() instanceof Player p)) return;
         InventoryHolder holder = e.getInventory().getHolder(false);
 
-        // 1. Player Selector
         if (holder instanceof PlayerSelectorHolder) {
             e.setCancelled(true);
             ItemStack item = e.getCurrentItem();
@@ -190,13 +187,11 @@ public class ShareGUI implements Listener {
                 if (meta.getOwningPlayer() != null && meta.getOwningPlayer().isOnline()) {
                     openBoosterSelector(p, meta.getOwningPlayer().getPlayer());
                 } else {
-                    p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.invalid_target", "&cNgười chơi không còn trực tuyến!")));
+                    p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.invalid_target", "&cPlayer is no longer online!")));
                     p.closeInventory();
                 }
             }
-        }
-        // 2. Booster Selector
-        else if (holder instanceof BoosterSelectorHolder bHolder) {
+        } else if (holder instanceof BoosterSelectorHolder bHolder) {
             e.setCancelled(true);
             ItemStack item = e.getCurrentItem();
             if (item == null || item.getType() == Material.AIR) return;
@@ -214,7 +209,7 @@ public class ShareGUI implements Listener {
             if (target != null) {
                 plugin.getBoosterManager().getShareManager().sendInvite(p, target, bId);
             } else {
-                p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.invalid_target", "&cNgười chơi không còn trực tuyến!")));
+                p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.invalid_target", "&cPlayer is no longer online!")));
             }
 
             p.closeInventory();
@@ -233,7 +228,7 @@ public class ShareGUI implements Listener {
         String mat = getMsg().getString("share_gui.back_button.material", "ARROW");
         ItemStack item = new ItemStack(Material.valueOf(mat));
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(ColorUtils.parse(getMsg().getString("share_gui.back_button.name")));
+        meta.displayName(ColorUtils.parse(getMsg().getString("share_gui.back_button.name", "&cBack")));
         item.setItemMeta(meta);
         return item;
     }
@@ -252,7 +247,6 @@ public class ShareGUI implements Listener {
         return format.replace("<day>", String.valueOf(d)).replace("<hour>", String.valueOf(h)).replace("<min>", String.valueOf(m)).replace("<sec>", String.valueOf(s));
     }
 
-    // --- HOLDERS ---
     public static class PlayerSelectorHolder implements InventoryHolder {
         private Inventory inventory;
 

@@ -114,7 +114,7 @@ public class ShareManager {
 
     public boolean checkSharePermission(Player p) {
         if (!p.hasPermission("sincebooster.share")) {
-            p.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.no_permission")));
+            p.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.no_permission", "You do not have permission to use the share feature.")));
             return false;
         }
         return true;
@@ -230,7 +230,7 @@ public class ShareManager {
 
     public void sendInviteBatch(Player sender, Player receiver, List<Booster> boosters) {
         if (boosters == null || boosters.isEmpty()) {
-            sender.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.no_boosters_to_share")));
+            sender.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.no_boosters_to_share", "No boosters available to share.")));
             return;
         }
 
@@ -250,7 +250,7 @@ public class ShareManager {
         }
 
         if (validBoosterIds.isEmpty()) {
-            sender.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.no_boosters_to_share")));
+            sender.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.no_boosters_to_share", "No boosters available to share.")));
             return;
         }
 
@@ -298,7 +298,7 @@ public class ShareManager {
         }
 
         if (target == null) {
-            sender.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.booster_not_found").replace("<id>", boosterId)));
+            sender.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.booster_not_found", "Booster <id> not found.").replace("<id>", boosterId)));
             return;
         }
         sendInviteBatch(sender, receiver, Collections.singletonList(target));
@@ -309,7 +309,7 @@ public class ShareManager {
         UUID sId = sender.getUniqueId();
 
         if (!pendingInvites.containsKey(rId) || !pendingInvites.get(rId).containsKey(sId)) {
-            String msg = plugin.getMessagesFile().getString("share.no_invite");
+            String msg = plugin.getMessagesFile().getString("share.no_invite", "No active invite found.");
             if (msg != null) receiver.sendMessage(ColorUtils.parseWithPrefix(msg));
             return;
         }
@@ -342,7 +342,7 @@ public class ShareManager {
                 receiver.sendMessage(ColorUtils.parseWithPrefix(msg2.replace("<player>", sender.getName())));
             plugin.getPlayerDataHandler().saveData(sId, false);
         } else {
-            receiver.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.limit_reached").replace("<current>", "?").replace("<max>", String.valueOf(maxShares))));
+            receiver.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.limit_reached", "Limit reached: <current>/<max>").replace("<current>", "?").replace("<max>", String.valueOf(maxShares))));
         }
     }
 
@@ -356,22 +356,22 @@ public class ShareManager {
                         plugin.getBoosterManager().removeFromIncomingCache(b, target.getUniqueId());
                         plugin.getPlayerDataHandler().saveData(owner.getUniqueId(), false);
 
-                        String targetName = target.getName() != null ? target.getName() : plugin.getMessagesFile().getString("share.unknown_player", "<red>Người chơi không tồn tại");
-                        owner.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.kick_success").replace("<booster>", getBoosterDisplayName(b)).replace("<target>", targetName)));
+                        String targetName = target.getName() != null ? target.getName() : plugin.getMessagesFile().getString("share.unknown_player", "<red>Player does not exist");
+                        owner.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.kick_success", "Stopped sharing <booster> with <target>.").replace("<booster>", getBoosterDisplayName(b)).replace("<target>", targetName)));
 
                         if (target.isOnline() && target.getPlayer() != null)
-                            target.getPlayer().sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.kick_target_notify").replace("<player>", owner.getName()).replace("<booster>", getBoosterDisplayName(b))));
+                            target.getPlayer().sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.kick_target_notify", "<player> stopped sharing <booster> with you.").replace("<player>", owner.getName()).replace("<booster>", getBoosterDisplayName(b))));
                         return;
                     }
                 }
             }
         }
-        owner.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.booster_not_found").replace("<id>", boosterId)));
+        owner.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.booster_not_found", "Booster <id> not found.").replace("<id>", boosterId)));
     }
 
     public void leaveShare(Player receiver, OfflinePlayer owner) {
         if (!owner.isOnline()) {
-            receiver.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.owner_offline")));
+            receiver.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.owner_offline", "Owner is currently offline.")));
             return;
         }
         Player ownerP = owner.getPlayer();
@@ -392,10 +392,10 @@ public class ShareManager {
         }
         if (leftAny) {
             plugin.getPlayerDataHandler().saveData(ownerP.getUniqueId(), false);
-            receiver.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.leave_success").replace("<owner>", ownerP.getName())));
-            ownerP.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.leave_owner_notify").replace("<player>", receiver.getName())));
+            receiver.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.leave_success", "Successfully left <owner>'s share.").replace("<owner>", ownerP.getName())));
+            ownerP.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.leave_owner_notify", "<player> left your shared booster.").replace("<player>", receiver.getName())));
         } else {
-            receiver.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.not_sharing_with_owner")));
+            receiver.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.not_sharing_with_owner", "You are not sharing any boosters with this player.")));
         }
     }
 

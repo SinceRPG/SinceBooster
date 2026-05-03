@@ -1,172 +1,162 @@
 # =====================================================
 #               MESSAGES & GUI CONFIG
 # =====================================================
-# Hỗ trợ mã màu & (Legacy) và MiniMessage (<green>, <gradient:red:blue>)
+# Supports Color codes & (Legacy) and MiniMessage (<green>, <gradient:red:blue>)
 
 prefix: "&8[&bSinceBooster&8] &r"
 
 admin:
-  reload: "&aĐã tải lại cấu hình thành công!"
-  view_title: "&8Kho Booster: &2<target>"
-  invalid_player: "&cXảy ra lỗi: Người chơi không tồn tại hoặc không trực tuyến."
-  set_rate_global: "&aĐã đặt giá trị Global &e<type> &athành &6<value>"
-  set_rate_player: "&aĐã đặt giá trị của &b<target> &e<type> &athành &6<value>"
-  remove_success: "&aĐã xóa Booster &e<id> &akhỏi người chơi &b<target>&a."
-  remove_all_success: "&aĐã xóa &ctất cả &aBooster của người chơi &b<target>&a."
+  reload: "&aConfiguration reloaded successfully!"
+  view_title: "&8Boosters: &2<target>"
+  invalid_player: "&cAn error occurred: Player does not exist or is offline."
+  set_rate_global: "&aSet Global &e<type> &ato &6<value>"
+  set_rate_player: "&aSet &b<target>'s &e<type> &ato &6<value>"
+  remove_success: "&aRemoved Booster &e<id> &afrom player &b<target>&a."
+  remove_all_success: "&aRemoved &call &aboosters from player &b<target>&a."
 
 share:
-  invalid_target: "&cMục tiêu không hợp lệ."
-  self_interaction: "&cBạn không thể thực hiện hành động này với chính mình."
-  no_boosters_to_share: "&cBạn không có Booster nào khả dụng để chia sẻ."
-  invite_sent: "&aĐã gửi lời mời dùng chung &e<booster_display> &acho &b<target>&a. Hết hạn trong <time>s."
-  invite_received: "&b<player> &amuốn chia sẻ &e<booster_display> &avới bạn. Gõ &6/booster accept <player> &ađể nhận."
+  invalid_target: "&cInvalid target."
+  self_interaction: "&cYou cannot perform this action on yourself."
+  no_boosters_to_share: "&cYou do not have any active boosters available to share."
+  invite_sent: "&aSent a share invite for &e<booster_display> &ato &b<target>&a. Expires in <time>s."
+  invite_received: "&b<player> &awants to share &e<booster_display> &awith you. Type &6/booster accept <player> &ato accept."
 
-  # Tin nhắn khi dùng /booster share <name> all
-  invite_batch_sent: "&aĐã gửi lời mời dùng chung &e<list> &acho &b<target>&a."
-  invite_batch_received: "&b<player> &amuốn chia sẻ &e<list> &avới bạn. Gõ &6/booster accept <player> &ađể nhận."
+  # Messages when using /booster share <name> all
+  invite_batch_sent: "&aSent batch share invites for &e<list> &ato &b<target>&a."
+  invite_batch_received: "&b<player> &awants to share &e<list> &awith you. Type &6/booster accept <player> &ato accept."
   batch_separator: "&7, &e"
 
-  booster_not_found: "&cKhông tìm thấy Booster có ID: &e<id>"
-  invalid_sender: "&cNgười gửi không hợp lệ."
-  sender_offline_or_invalid: "&cNgười gửi lời mời hiện không trực tuyến."
-  no_invite: "&cBạn không có lời mời nào từ người chơi này hoặc lời mời đã hết hạn."
+  booster_not_found: "&cCould not find Booster with ID: &e<id>"
+  invalid_sender: "&cInvalid sender."
+  sender_offline_or_invalid: "&cThe sender of the invite is no longer online."
+  no_invite: "&cYou have no pending invites from this player or the invite has expired."
 
-  accepted_sender: "&b<target> &ađã chấp nhận dùng chung Booster của bạn!"
-  accepted_receiver: "&aBạn đã bắt đầu dùng chung Booster của &b<player>&a!"
-  limit_reached: "&cLỗi: Đã đạt giới hạn chia sẻ (<current>/<max>)."
+  accepted_sender: "&b<target> &ahas accepted your booster share!"
+  accepted_receiver: "&aYou have successfully started sharing a booster with &b<player>&a!"
+  limit_reached: "&cError: Share limit reached (<current>/<max>)."
 
-  kick_success: "&aĐã ngừng chia sẻ &e<booster> &avới &c<target>&a."
-  kick_target_notify: "&c<player> &đã ngừng chia sẻ &e<booster> &cvới bạn."
-  unknown_player: "&cKhông xác định"
+  kick_success: "&aStopped sharing &e<booster> &awith &c<target>&a."
+  kick_target_notify: "&c<player> &cstopped sharing &e<booster> &cwith you."
+  unknown_player: "&cUnknown"
 
-  owner_offline: "&cChủ sở hữu Booster hiện không online."
-  leave_success: "&aĐã hủy dùng chung các Booster từ &b<owner>&a."
-  leave_owner_notify: "&e<player> &ađã tự rời khỏi danh sách chia sẻ của bạn."
-  not_sharing_with_owner: "&cBạn đang không dùng chung Booster nào từ người này."
-  no_permission: "&cBạn không có quyền sử dụng tính năng chia sẻ Booster (sincebooster.share)."
-  offline_share_active: "&7(Offline Share: &aBật&7)"
-  offline_share_inactive: "&7(Offline Share: &cTắt&7)"
-  offline_toggle_on: "&aĐã &2BẬT &atính năng chia sẻ khi Offline."
-  offline_toggle_off: "&cĐã &4TẮT &ctính năng chia sẻ khi Offline."
-  offline_no_perm: "&cBạn không có quyền sử dụng tính năng chia sẻ khi Offline (sincebooster.share.offline)."
+  owner_offline: "&cThe owner of this booster is currently offline."
+  leave_success: "&aSuccessfully cancelled shared boosters from &b<owner>&a."
+  leave_owner_notify: "&e<player> &aopted to leave your shared booster."
+  not_sharing_with_owner: "&cYou are not sharing any boosters with this player."
+  no_permission: "&cYou do not have permission to use the share feature (sincebooster.share)."
+  offline_share_active: "&7(Offline Share: &aEnabled&7)"
+  offline_share_inactive: "&7(Offline Share: &cDisabled&7)"
+  offline_toggle_on: "&aSuccessfully &2ENABLED &aoffline sharing."
+  offline_toggle_off: "&cSuccessfully &4DISABLED &coffline sharing."
+  offline_no_perm: "&cYou do not have permission to toggle offline sharing (sincebooster.share.offline)."
 
 booster:
   receive:
-    extend: "&aBooster &e<id> &ađã được gia hạn thêm &b<time> giây&a!"
-    permanent: "&aBạn nhận được Booster Vĩnh viễn: &e<id> &7(x<multiplier>)&a!"
-    duration: "&aBạn nhận được Booster: &e<id> &7(x<multiplier> trong <time>s)&a!"
-  expired: "&cBooster &e<id> &ccủa bạn đã hết hạn!"
+    extend: "&aBooster &e<id> &ahas been extended by &b<time> seconds&a!"
+    permanent: "&aYou received a Permanent Booster: &e<id> &7(x<multiplier>)&a!"
+    duration: "&aYou received a Booster: &e<id> &7(x<multiplier> for <time>s)&a!"
+  expired: "&cYour booster &e<id> &chas expired!"
 
   gui:
-    title: "&0Danh Sách Booster"
-    action_cooldown: "&c&lVui lòng thao tác chậm lại!"
-    closed_on_reload: "&cMenu đã đóng do server reload."
+    title: "&0Boosters List"
+    action_cooldown: "&c&lPlease slow down your actions!"
+    closed_on_reload: "&cMenu closed due to server reload."
 
-    # Định dạng thời gian
     formats:
       time_left: "&f<day>d <hour>h <min>m <sec>s"
 
-    # Nút chia sẻ (Ở giữa hàng dưới cùng)
     share_button:
-      name: "&e&lChia sẻ Booster"
+      name: "&e&lShare Booster"
       material: "OAK_SIGN"
       slot: 49
       lore:
-        - "&7Click để chọn người chơi"
-        - "&7và chia sẻ hiệu quả Booster."
+        - "&7Click to select a player"
+        - "&7and share booster benefits."
         - ""
-        - "&bClick để mở menu!"
-    # [MỚI] Nút Bật/Tắt Offline Share
+        - "&bClick to open menu!"
+
     offline_toggle_button:
       slot: 50
-      # Trạng thái khi ĐANG BẬT -> Click để Tắt
       enabled:
-        name: "&aShare Offline: &2ĐANG BẬT"
+        name: "&aOffline Share: &2ON"
         material: "LIME_DYE"
         lore:
-          - "&7Booster vẫn sẽ hoạt động cho"
-          - "&7người được share khi bạn Offline."
+          - "&7Boosters will remain active for"
+          - "&7shared receivers when you log off."
           - ""
-          - "&eClick để TẮT tính năng này."
-      # Trạng thái khi ĐANG TẮT -> Click để Bật
+          - "&eClick to DISABLE this feature."
       disabled:
-        name: "&cShare Offline: &4ĐANG TẮT"
+        name: "&cOffline Share: &4OFF"
         material: "GRAY_DYE"
         lore:
-          - "&7Booster sẽ ngừng tác dụng"
-          - "&7với người nhận khi bạn Offline."
+          - "&7Boosters will deactivate for"
+          - "&7shared receivers when you log off."
           - ""
-          - "&eClick để BẬT tính năng này."
-      # Trạng thái khi KHÔNG CÓ QUYỀN
+          - "&eClick to ENABLE this feature."
       no_perm:
-        name: "&7Share Offline: &cKhóa"
+        name: "&7Offline Share: &cLocked"
         material: "BARRIER"
         lore:
-          - "&7Bạn không có quyền sử dụng"
-          - "&7tính năng chia sẻ khi Offline."
+          - "&7You do not have permission"
+          - "&7to share offline."
           - ""
-          - "&cYêu cầu: sincebooster.share.offline"
+          - "&cRequirement: sincebooster.share.offline"
 
-    # Item hiển thị Booster
     item:
-      # Booster của chính mình
       own:
-        name_time: "&6<id> &7(Còn lại: <time>)"
-        name_perm: "&d&lPERM: &6<id> &7(Vĩnh viễn)"
+        name_time: "&6<id> &7(Left: <time>)"
+        name_perm: "&d&lPERM: &6<id> &7(Permanent)"
         lore:
-          - "&7Loại: <type_color><type_name>"
-          - "&7Hệ số nhân: &e+<percent>%"
+          - "&7Type: <type_color><type_name>"
+          - "&7Multiplier: &e+<percent>%"
           - ""
-          - "&7Trạng thái: <status>"
-          - "&7Đang chia sẻ với: &f<shared_count> người"
-          - "&7Tốc độ hao mòn: &c<decay_rate>x/s"
-          - "&7Hiệu suất bản thân: &a<efficiency>%"
+          - "&7Status: <status>"
+          - "&7Sharing with: &f<shared_count> players"
+          - "&7Decay Rate: &c<decay_rate>x/s"
+          - "&7Personal Efficiency: &a<efficiency>%"
           - ""
-          - "&fDanh sách chia sẻ:"
+          - "&fShared With:"
           - "<shared_list>"
           - ""
-          - "&eClick &7để quản lý chia sẻ."
+          - "&eClick &7to manage shares."
 
-      # Booster được người khác share cho mình
       received:
-        name_time: "&bShare: &f<id> &7(<time>)"
-        name_perm: "&bShare: &dPERM &f<id>"
+        name_time: "&bShared: &f<id> &7(<time>)"
+        name_perm: "&bShared: &dPERM &f<id>"
         lore:
-          - "&7Chủ sở hữu: &f<owner_name>"
-          - "&7Loại: <type_color><type_name>"
-          - "&7Hệ số gốc: &e+<base_multiplier>x"
+          - "&7Owner: &f<owner_name>"
+          - "&7Type: <type_color><type_name>"
+          - "&7Base Multiplier: &e+<base_multiplier>x"
           - ""
-          - "&7Hiệu suất nhận: &b<efficiency>%"
-          - "&7Thực nhận: &a+<real_multiplier>x"
+          - "&7Receiver Efficiency: &b<efficiency>%"
+          - "&7Actual Multiplier: &a+<real_multiplier>x"
           - ""
-          - "&7Trạng thái: <status>"
+          - "&7Status: <status>"
           - ""
-          - "&cShift + Click &7để hủy nhận share."
+          - "&cShift + Click &7to cancel share."
 
-      status_perm: "&aĐang hoạt động"
-      status_time: "&eHết hạn sau: &f<time_left>"
-      shared_list_none: "&7- (Chưa chia sẻ)"
+      status_perm: "&aActive"
+      status_time: "&eExpires in: &f<time_left>"
+      shared_list_none: "&7- (None)"
       shared_list_format: "&7- &f<player>"
 
-    # Tổng kết Class XP
     summary_class:
       material: "EXPERIENCE_BOTTLE"
-      name: "&aTổng kết Class XP"
+      name: "&aClass XP Summary"
       lore:
-        - "&7Tổng hệ số: &e<total_multiplier>x &7(+<total_percent>%)"
+        - "&7Total Multiplier: &e<total_multiplier>x &7(+<total_percent>%)"
         - ""
-        - "&fChi tiết:"
-        - "&7- Của bạn: &a+<own_percent>%"
-        - "&7- Được share: &b+<shared_percent>%"
+        - "&fDetails:"
+        - "&7- Owned: &a+<own_percent>%"
+        - "&7- Shared: &b+<shared_percent>%"
 
-    # Tổng kết Job/Profession XP
     summary_prof:
       material: "WRITABLE_BOOK"
-      name: "&6Tổng kết Nghề Nghiệp"
+      name: "&6Profession XP Summary"
       prof_format: "&7- <profession>: &e<multiplier>x &7(+<percent>%)"
-      prof_none: "&7Không có booster nghề nghiệp nào."
+      prof_none: "&7No active profession boosters."
       lore:
-        - "&7Các hệ số đang áp dụng:"
+        - "&7Applied Multipliers:"
         - ""
         - "<prof_list>"
 
@@ -174,61 +164,51 @@ booster:
       material: "BLACK_STAINED_GLASS_PANE"
 
     empty_slot:
-      name: "&cChỗ trống"
+      name: "&cEmpty Slot"
       lore:
-        - "&7Nhận thêm booster để lấp đầy!"
+        - "&7Acquire more boosters to fill this up!"
 
-# =====================================================
-#                 GUI: SHARE MANAGER
-# =====================================================
 share_gui:
-  # Menu chọn người chơi
   player_selector:
-    title: "&0Chọn người nhận"
+    title: "&0Select Receiver"
     item_name: "&e<player_name>"
     lore:
-      - "&7Click để chọn người này"
-      - "&7làm đối tượng chia sẻ."
+      - "&7Click to select this player"
+      - "&7as a share target."
 
-  # Menu chọn Booster để share
   booster_selector:
-    title: "&0Chọn Booster để chia sẻ"
+    title: "&0Select Booster to Share"
     item:
       name_time: "&6<id> &7(<time>)"
-      name_perm: "&d<id> &7(Vĩnh viễn)"
-      status_full: "&cĐã đầy (<current>/<max>)"
-      status_available: "&aCó thể share (<current>/<max>)"
+      name_perm: "&d<id> &7(Permanent)"
+      status_full: "&cFull (<current>/<max>)"
+      status_available: "&aAvailable (<current>/<max>)"
       lore:
-        - "&7Loại: <type_color><type_name>"
-        - "&7Hệ số: &e<multiplier>x &7(+<percent>%)"
+        - "&7Type: <type_color><type_name>"
+        - "&7Multiplier: &e<multiplier>x &7(+<percent>%)"
         - ""
-        - "&7Người nhận sẽ được: &b<rec_multiplier>x &7(+<rec_percent>%)"
-        - "&7Slot: <slot_color><status_text>"
+        - "&7Receiver will get: &b<rec_multiplier>x &7(+<rec_percent>%)"
+        - "&7Slots: <slot_color><status_text>"
         - ""
-        - "&eClick để gửi lời mời!"
+        - "&eClick to send invite!"
 
   back_button:
     material: "ARROW"
-    name: "&cQuay lại"
+    name: "&cBack"
 
-# =====================================================
-#                GUI: MANAGE SHARES
-# =====================================================
 manage_share_gui:
-  title: "&0Quản lý người được share"
+  title: "&0Manage Shares"
   item_name: "&cKick: &f<player>"
   lore:
-    - "&7Click để đuổi người chơi này"
-    - "&7khỏi danh sách hưởng booster."
+    - "&7Click to kick this player"
+    - "&7from receiving the booster."
 
   empty:
-    name: "&cChưa share cho ai"
+    name: "&cNot Sharing"
     lore:
-      - "&7Booster này chưa được chia sẻ"
-      - "&7cho bất kỳ ai."
-# =====================================================
-#                INTERNAL LOG MESSAGES
-# =====================================================
+      - "&7This booster is not currently"
+      - "&7being shared with anyone."
+
 log:
   hook_mmocore_success: "Hooked into MMOCore successfully!"
   hook_mmocore_fail: "MMOCore not found! Exp multipliers will not work."

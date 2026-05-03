@@ -57,7 +57,7 @@ public class ManageShareGUI implements Listener {
 
         if (booster == null) return;
 
-        String title = getMsg().getString("manage_share_gui.title", "Quản lý Share");
+        String title = getMsg().getString("manage_share_gui.title", "Manage Shares");
         ManageHolder holder = new ManageHolder(boosterId);
         Inventory inv = Bukkit.createInventory(holder, 27, ColorUtils.parse(title));
         holder.setInventory(inv);
@@ -97,7 +97,7 @@ public class ManageShareGUI implements Listener {
     private ItemStack createEmptyItem() {
         ItemStack item = new ItemStack(Material.BARRIER);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(ColorUtils.parse(getMsg().getString("manage_share_gui.empty.name")));
+        meta.displayName(ColorUtils.parse(getMsg().getString("manage_share_gui.empty.name", "&cNo Shares Active")));
         List<Component> lore = new ArrayList<>();
         for (String s : getMsg().getConfig().getStringList("manage_share_gui.empty.lore"))
             lore.add(ColorUtils.parse(s));
@@ -136,10 +136,8 @@ public class ManageShareGUI implements Listener {
                     target = Bukkit.getOfflinePlayer(targetUUID);
                 }
 
-                // KICK logic
                 plugin.getBoosterManager().getShareManager().kickShare(p, holder.getBoosterId(), target);
 
-                // Refresh
                 open(p, holder.getBoosterId());
             }
         }

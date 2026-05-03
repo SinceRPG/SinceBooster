@@ -3,40 +3,40 @@
 # =====================================================
 
 database:
-  # Loại cơ sở dữ liệu: "SQLITE" (lưu vào file .db) hoặc "MYSQL" (kết nối máy chủ dữ liệu)
+  # Database type: "SQLITE" (saved to a .db file) or "MYSQL" (remote database server)
   type: "SQLITE"
   host: "localhost"
   port: "3306"
   database: "minecraft"
   username: "root"
   password: ""
-  # Tên các bảng trong database (nên để mặc định)
+  # Names of the tables in the database (recommend leaving default)
   table_users: "sincebooster_users"
   table_boosters: "sincebooster_boosters"
 
 share:
-  # Tỷ lệ hao mòn thời gian khi đang chia sẻ Booster cho người khác.
-  # Ví dụ: 2.0 nghĩa là Booster sẽ hết hạn nhanh gấp đôi khi có người dùng chung.
+  # Decay rate of time when sharing a Booster with other players.
+  # Example: 2.0 means the Booster will expire twice as fast when shared.
   default-rate: 2.0
 
-  # Hiệu suất của CHỦ SỞ HỮU khi chia sẻ cho người khác (0.75 = 75%).
-  # Ví dụ: Booster x10 (Bonus +9), bạn sẽ nhận được: 1 + (9 * 0.75) = 7.75x
+  # Efficiency for the OWNER when sharing with others (0.75 = 75%).
+  # Example: Booster x10 (Bonus +9), you will receive: 1 + (9 * 0.75) = 7.75x
   default-owner-buff: 0.75
 
-  # Hiệu suất của NGƯỜI NHẬN khi chủ sở hữu đang ONLINE (0.5 = 50%).
-  # Ví dụ: Booster x10 (Bonus +9), người nhận được: 1 + (9 * 0.5) = 5.5x
+  # Efficiency for the RECEIVER when the owner is ONLINE (0.5 = 50%).
+  # Example: Booster x10 (Bonus +9), the receiver gets: 1 + (9 * 0.5) = 5.5x
   default-receiver-buff: 0.5
 
-  # Số người tối đa mà một người chơi có thể chia sẻ Booster cùng lúc.
+  # Maximum number of players a single player can share a Booster with concurrently.
   default-share-limit: 1
 
   offline:
-    # Cho phép Booster tiếp tục hoạt động cho người nhận ngay cả khi chủ sở hữu thoát game.
+    # Allows the Booster to continue working for receivers even when the owner disconnects.
     enabled: true
-    # Hiệu suất của NGƯỜI NHẬN khi chủ sở hữu đang OFFLINE (0.25 = 25%).
-    # Ví dụ: Booster x10 (Bonus +9), người nhận được: 1 + (9 * 0.25) = 3.25x
+    # Efficiency for the RECEIVER when the owner is OFFLINE (0.25 = 25%).
+    # Example: Booster x10 (Bonus +9), the receiver gets: 1 + (9 * 0.25) = 3.25x
     default-offline-rate: 0.25
 
-# Thời gian tự động lưu dữ liệu từ RAM vào Database (tính bằng giây).
-# 300 giây = 5 phút lưu 1 lần để tránh mất dữ liệu khi crash.
+# Time interval (in seconds) to auto-save RAM data to the Database.
+# 300 seconds = 5 minutes per save to prevent data loss upon crash.
 auto-save: 300

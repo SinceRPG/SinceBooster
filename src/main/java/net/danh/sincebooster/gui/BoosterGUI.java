@@ -49,7 +49,6 @@ public class BoosterGUI implements Listener {
             public void run() {
                 for (Player p : Bukkit.getOnlinePlayers()) {
                     Inventory topInv = p.getOpenInventory().getTopInventory();
-                    // CRITICAL FIX: Use getHolder(false)
                     if (topInv.getHolder(false) instanceof BoosterHolder holder) {
                         updateContent(topInv, holder.getTargetUUID(), p);
                     }
@@ -58,17 +57,21 @@ public class BoosterGUI implements Listener {
         }.runTaskTimer(plugin, 20L, 20L);
     }
 
+    public void open(Player p) {
+        open(p, p);
+    }
+
     public void open(Player viewer, Player target) {
         String titleStr;
         if (viewer.getUniqueId().equals(target.getUniqueId())) {
-            titleStr = getMsg().getString("booster.gui.title", "Danh Sách Booster");
+            titleStr = getMsg().getString("booster.gui.title", "Boosters List");
         } else {
-            titleStr = getMsg().getString("admin.view_title", "Kho: <target>").replace("<target>", target.getName());
+            titleStr = getMsg().getString("admin.view_title", "Boosters: <target>").replace("<target>", target.getName());
         }
 
         BoosterHolder holder = new BoosterHolder(target.getUniqueId());
         Inventory inv = Bukkit.createInventory(holder, 54, ColorUtils.parse(titleStr));
-        holder.setInventory(inv); // Nạp inv vào holder để thỏa mãn @NotNull
+        holder.setInventory(inv);
 
         updateContent(inv, target.getUniqueId(), viewer);
         viewer.openInventory(inv);
@@ -243,13 +246,13 @@ public class BoosterGUI implements Listener {
 
                 String sharedListStr;
                 if (b.getSharedPlayers().isEmpty()) {
-                    sharedListStr = getMsg().getString("booster.gui.item.shared_list_none");
+                    sharedListStr = getMsg().getString("booster.gui.item.shared_list_none", "&7- (No active shares)");
                 } else {
                     StringBuilder sb = new StringBuilder();
                     for (UUID uid : b.getSharedPlayers()) {
                         OfflinePlayer op = Bukkit.getOfflinePlayer(uid);
                         String pName = (op.getName() != null) ? op.getName() : "Unknown";
-                        String format = getMsg().getString("booster.gui.item.shared_list_format");
+                        String format = getMsg().getString("booster.gui.item.shared_list_format", "&7- &f<player>");
                         sb.append(format.replace("<player>", pName)).append("\n");
                     }
                     sharedListStr = sb.toString().trim();
@@ -463,7 +466,7 @@ public class BoosterGUI implements Listener {
                 if (p.getPersistentDataContainer().has(cooldownKey, PersistentDataType.LONG)) {
                     Long lastClick = p.getPersistentDataContainer().get(cooldownKey, PersistentDataType.LONG);
                     if (lastClick != null && System.currentTimeMillis() - lastClick < 2000) {
-                        p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("booster.gui.action_cooldown", "&cVui lòng thao tác chậm lại!")));
+                        p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("booster.gui.action_cooldown", "&cPlease slow down!")));
                         return;
                     }
                 }
