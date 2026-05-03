@@ -21,22 +21,23 @@ public class JoinQuit implements Listener {
     @EventHandler
     public void onJoin(PlayerJoinEvent e) {
         plugin.getPlayerDataHandler().loadData(e.getPlayer());
-
         plugin.getBoosterManager().getShareManager().updateOfflineSharesOnJoin(e.getPlayer());
     }
 
+    /**
+     * Memory Cleanup Task:
+     * Validates if the disconnecting player is actively broadcasting offline booster shares to current online players.
+     * If absolutely no online player requires their data, the plugin effectively wipes them out of active RAM.
+     */
     @EventHandler
     public void onQuit(PlayerQuitEvent e) {
         UUID quitUUID = e.getPlayer().getUniqueId();
         plugin.getPlayerDataHandler().saveData(quitUUID, true);
 
-        // Dọn dẹp RAM: Kiểm tra xem còn ai online nhận booster của những người offline không
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             plugin.getBoosterManager().getActiveBoosters().keySet().removeIf(ownerId -> {
-                // Nếu chủ đang online thì không xóa
                 if (Bukkit.getPlayer(ownerId) != null) return false;
 
-                // Nếu không còn ai online được share booster của người này -> Xóa khỏi RAM
                 boolean stillNeeded = Bukkit.getOnlinePlayers().stream().anyMatch(onlineP -> {
                     List<Booster> boosters = plugin.getBoosterManager().getActiveBoosters(ownerId);
                     return boosters != null && boosters.stream().anyMatch(b -> b.getSharedPlayers().contains(onlineP.getUniqueId()));
@@ -44,6 +45,6 @@ public class JoinQuit implements Listener {
 
                 return !stillNeeded;
             });
-        }, 40L); // Chờ 2 giây sau khi quit để dọn dẹp
+        }, 40L);
     }
 }

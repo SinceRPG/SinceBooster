@@ -226,3 +226,13 @@ manage_share_gui:
     lore:
       - "&7Booster này chưa được chia sẻ"
       - "&7cho bất kỳ ai."
+# =====================================================
+#                INTERNAL LOG MESSAGES
+# =====================================================
+log:
+  hook_mmocore_success: "Hooked into MMOCore successfully!"
+  hook_mmocore_fail: "MMOCore not found! Exp multipliers will not work."
+  saving_data: "Saving player data..."
+  db_create_fail: "Could not create database tables!"
+  db_save_error: "Error saving data for <uuid> - Transaction rolled back!"
+  temp_load_boosters: "Temporarily loaded <count> boosters for <uuid> to process offline sharing."

@@ -20,6 +20,7 @@ import net.danh.sincebooster.utils.ColorUtils;
 import net.danh.sincebooster.utils.ConfigUtils;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
 import org.bukkit.inventory.Inventory;
@@ -30,7 +31,12 @@ import org.jspecify.annotations.NonNull;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 
+/**
+ * Main plugin class for SinceBooster.
+ * Handles the initialization of configuration files, database connections, managers, commands, and listeners.
+ */
 public final class SinceBooster extends JavaPlugin {
     private static SinceBooster plugin;
     private MiniMessage miniMessage;
@@ -52,19 +58,15 @@ public final class SinceBooster extends JavaPlugin {
         plugin = this;
         miniMessage = MiniMessage.miniMessage();
 
-        // 1. Load Configs
         configFile = new ConfigUtils(this, "config.yml");
         messagesFile = new ConfigUtils(this, "messages.yml");
 
-        // 2. Initialize Data
         databaseManager = new DatabaseManager(this);
         playerDataHandler = new PlayerDataHandler(this);
 
-        // 3. Initialize Managers
         boosterManager = new BoosterManager(this);
         boosterGUI = new BoosterGUI(this);
 
-        // 4. Register Listeners
         registerListeners(
                 new JoinQuit(this),
                 boosterGUI,
@@ -72,18 +74,15 @@ public final class SinceBooster extends JavaPlugin {
                 new ManageShareGUI(this)
         );
 
-        // 5. Hook MMOCore
         if (Bukkit.getPluginManager().isPluginEnabled("MMOCore")) {
             getServer().getPluginManager().registerEvents(new MMOCoreHook(this), this);
-            getLogger().info("Hooked into MMOCore successfully!");
+            getLogger().info(messagesFile.getString("log.hook_mmocore_success", "Hooked into MMOCore successfully!"));
         } else {
-            getLogger().warning("MMOCore not found! Exp multipliers will not work.");
+            getLogger().warning(messagesFile.getString("log.hook_mmocore_fail", "MMOCore not found! Exp multipliers will not work."));
         }
 
-        // 6. Register Commands
         registerCommands();
 
-        // 7. Start Tasks
         boosterGUI.startUpdateTask();
         startAutoSaveTask();
     }
@@ -92,26 +91,27 @@ public final class SinceBooster extends JavaPlugin {
     public void onDisable() {
         Bukkit.getScheduler().cancelTasks(this);
         if (playerDataHandler != null) {
-            getLogger().info("Saving player data...");
+            getLogger().info(messagesFile.getString("log.saving_data", "Saving player data..."));
             playerDataHandler.saveAllSync();
         }
         if (databaseManager != null) databaseManager.close();
     }
 
+    /**
+     * Reloads configuration files and safely closes any active Booster GUIs to prevent desync.
+     */
     public void reloadFiles() {
         for (Player p : Bukkit.getOnlinePlayers()) {
             Inventory topInv = p.getOpenInventory().getTopInventory();
-            // CRITICAL FIX: Use getHolder(false) to prevent expensive block state snapshots
             InventoryHolder holder = topInv.getHolder(false);
 
-            // Đóng GUI dựa trên InventoryHolder thay vì Title để tránh xung đột
             if (holder instanceof BoosterGUI.BoosterHolder ||
                     holder instanceof ShareGUI.PlayerSelectorHolder ||
                     holder instanceof ShareGUI.BoosterSelectorHolder ||
                     holder instanceof ManageShareGUI.ManageHolder) {
 
                 p.closeInventory();
-                p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("booster.gui.closed_on_reload")));
+                p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("booster.gui.closed_on_reload", "Menu closed due to server reload.")));
             }
         }
         configFile.reload();
@@ -134,7 +134,7 @@ public final class SinceBooster extends JavaPlugin {
                             .requires(s -> s.getSender().hasPermission("sincebooster.admin"))
                             .executes(ctx -> {
                                 reloadFiles();
-                                ctx.getSource().getSender().sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("admin.reload")));
+                                ctx.getSource().getSender().sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("admin.reload", "Configuration reloaded successfully!")));
                                 return 1;
                             })
                     )
@@ -153,16 +153,13 @@ public final class SinceBooster extends JavaPlugin {
                                             if (target != null) {
                                                 boosterGUI.open(viewer, target);
                                             } else {
-                                                viewer.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("admin.invalid_player")));
+                                                viewer.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("admin.invalid_player", "Invalid or offline player.")));
                                             }
                                         }
                                         return 1;
                                     })
                             )
                     )
-                    // ==========================================
-                    //            NEW COMMAND: REMOVE
-                    // ==========================================
                     .then(Commands.literal("remove")
                             .requires(s -> s.getSender().hasPermission("sincebooster.admin"))
                             .then(Commands.argument("target", StringArgumentType.word())
@@ -176,9 +173,7 @@ public final class SinceBooster extends JavaPlugin {
                                                     if (t != null) {
                                                         List<Booster> list = boosterManager.getActiveBoosters(t.getUniqueId());
                                                         if (list != null) {
-                                                            for (Booster b : list) {
-                                                                builder.suggest(b.getId());
-                                                            }
+                                                            for (Booster b : list) builder.suggest(b.getId());
                                                         }
                                                     }
                                                 } catch (IllegalArgumentException ignored) {
@@ -191,27 +186,26 @@ public final class SinceBooster extends JavaPlugin {
                                                 Player t = Bukkit.getPlayer(tName);
 
                                                 if (t == null) {
-                                                    ctx.getSource().getSender().sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("admin.invalid_player")));
+                                                    ctx.getSource().getSender().sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("admin.invalid_player", "Invalid or offline player.")));
                                                     return 0;
                                                 }
 
-                                                // Xử lý xóa
                                                 if (bId.equalsIgnoreCase("all")) {
                                                     boosterManager.removeAllBoosters(t);
                                                     ctx.getSource().getSender().sendMessage(ColorUtils.parseWithPrefix(
-                                                            messagesFile.getString("admin.remove_all_success").replace("<target>", t.getName())
+                                                            messagesFile.getString("admin.remove_all_success", "Removed all boosters from <target>.").replace("<target>", t.getName())
                                                     ));
                                                 } else {
                                                     boolean success = boosterManager.removeBooster(t, bId);
                                                     if (success) {
                                                         ctx.getSource().getSender().sendMessage(ColorUtils.parseWithPrefix(
-                                                                messagesFile.getString("admin.remove_success")
+                                                                messagesFile.getString("admin.remove_success", "Removed <id> from <target>.")
                                                                         .replace("<target>", t.getName())
                                                                         .replace("<id>", bId)
                                                         ));
                                                     } else {
                                                         ctx.getSource().getSender().sendMessage(ColorUtils.parseWithPrefix(
-                                                                messagesFile.getString("share.booster_not_found").replace("<id>", bId)
+                                                                messagesFile.getString("share.booster_not_found", "Booster <id> not found.").replace("<id>", bId)
                                                         ));
                                                     }
                                                 }
@@ -231,10 +225,7 @@ public final class SinceBooster extends JavaPlugin {
                                                                     .executes(ctx -> executeGive(ctx, false, null))
                                                                     .then(Commands.argument("profession", StringArgumentType.word())
                                                                             .suggests((ctx, builder) -> suggestProfessions(builder))
-                                                                            .executes(ctx -> {
-                                                                                String prof = StringArgumentType.getString(ctx, "profession");
-                                                                                return executeGive(ctx, false, prof);
-                                                                            })
+                                                                            .executes(ctx -> executeGive(ctx, false, StringArgumentType.getString(ctx, "profession")))
                                                                     )
                                                             )
                                                     )
@@ -242,10 +233,7 @@ public final class SinceBooster extends JavaPlugin {
                                                             .executes(ctx -> executeGive(ctx, true, null))
                                                             .then(Commands.argument("profession", StringArgumentType.word())
                                                                     .suggests((ctx, builder) -> suggestProfessions(builder))
-                                                                    .executes(ctx -> {
-                                                                        String prof = StringArgumentType.getString(ctx, "profession");
-                                                                        return executeGive(ctx, true, prof);
-                                                                    })
+                                                                    .executes(ctx -> executeGive(ctx, true, StringArgumentType.getString(ctx, "profession")))
                                                             )
                                                     )
                                             )
@@ -258,22 +246,21 @@ public final class SinceBooster extends JavaPlugin {
                                         Player p = (Player) ctx.getSource().getExecutor();
                                         if (p == null) return 0;
 
-                                        // Check quyền Offline Share
                                         if (!(p.hasPermission("sincebooster.share.offline") && p.hasPermission("sincebooster.share"))) {
-                                            p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.offline_no_perm")));
+                                            p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.offline_no_perm", "No permission for offline share.")));
                                             return 0;
                                         }
 
                                         PlayerDataHandler.PlayerSession session = playerDataHandler.getSession(p.getUniqueId());
                                         if (session != null) {
                                             boolean current = session.isOfflineShareEnabled();
-                                            session.setOfflineShareEnabled(!current); // Đảo ngược trạng thái
+                                            session.setOfflineShareEnabled(!current);
                                             playerDataHandler.saveData(p.getUniqueId(), false);
 
                                             if (!current) {
-                                                p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.offline_toggle_on")));
+                                                p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.offline_toggle_on", "Offline sharing enabled.")));
                                             } else {
-                                                p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.offline_toggle_off")));
+                                                p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.offline_toggle_off", "Offline sharing disabled.")));
                                             }
                                         }
                                         return 1;
@@ -285,7 +272,7 @@ public final class SinceBooster extends JavaPlugin {
                                         Player p = (Player) ctx.getSource().getExecutor();
                                         Player t = Bukkit.getPlayer(StringArgumentType.getString(ctx, "target"));
                                         if (p != null && !p.hasPermission("sincebooster.share")) {
-                                            p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.no_permission")));
+                                            p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.no_permission", "No share permission.")));
                                             return 0;
                                         }
                                         if (validateShare(p, t)) {
@@ -307,7 +294,7 @@ public final class SinceBooster extends JavaPlugin {
                                                 Player t = Bukkit.getPlayer(StringArgumentType.getString(ctx, "target"));
                                                 String bId = StringArgumentType.getString(ctx, "booster_id");
                                                 if (p != null && !p.hasPermission("sincebooster.share")) {
-                                                    p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.no_permission")));
+                                                    p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.no_permission", "No share permission.")));
                                                     return 0;
                                                 }
                                                 if (validateShare(p, t)) {
@@ -370,8 +357,8 @@ public final class SinceBooster extends JavaPlugin {
                                                     if (list != null) {
                                                         for (Booster b : list) {
                                                             if (b.getId().equalsIgnoreCase(bId)) {
-                                                                for (java.util.UUID uid : b.getSharedPlayers()) {
-                                                                    org.bukkit.OfflinePlayer op = Bukkit.getOfflinePlayer(uid);
+                                                                for (UUID uid : b.getSharedPlayers()) {
+                                                                    OfflinePlayer op = Bukkit.getOfflinePlayer(uid);
                                                                     if (op.getName() != null)
                                                                         builder.suggest(op.getName());
                                                                 }
@@ -408,7 +395,7 @@ public final class SinceBooster extends JavaPlugin {
                                                 String type = StringArgumentType.getString(ctx, "type");
                                                 double val = DoubleArgumentType.getDouble(ctx, "value");
                                                 boosterManager.getShareManager().setGlobalValue(typeToConfig(type), val);
-                                                ctx.getSource().getSender().sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("admin.set_rate_global").replace("<type>", type).replace("<value>", String.valueOf(val))));
+                                                ctx.getSource().getSender().sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("admin.set_rate_global", "Set <type> to <value>").replace("<type>", type).replace("<value>", String.valueOf(val))));
                                                 return 1;
                                             })
                                             .then(Commands.argument("target", StringArgumentType.word())
@@ -428,7 +415,7 @@ public final class SinceBooster extends JavaPlugin {
                                                                 }
                                                                 playerDataHandler.saveData(t.getUniqueId(), false);
                                                             }
-                                                            ctx.getSource().getSender().sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("admin.set_rate_player").replace("<type>", type).replace("<target>", t.getName()).replace("<value>", String.valueOf(val))));
+                                                            ctx.getSource().getSender().sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("admin.set_rate_player", "Set <target>'s <type> to <value>").replace("<type>", type).replace("<target>", t.getName()).replace("<value>", String.valueOf(val))));
                                                         }
                                                         return 1;
                                                     })
@@ -443,11 +430,11 @@ public final class SinceBooster extends JavaPlugin {
 
     private boolean validateShare(Player p, Player t) {
         if (t == null) {
-            if (p != null) p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.invalid_target")));
+            if (p != null) p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.invalid_target", "Invalid target.")));
             return false;
         }
         if (p != null && t.getUniqueId().equals(p.getUniqueId())) {
-            p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.self_interaction")));
+            p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("share.self_interaction", "Cannot interact with yourself.")));
             return false;
         }
         return true;

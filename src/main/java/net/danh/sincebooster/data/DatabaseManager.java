@@ -9,15 +9,17 @@ import java.io.File;
 import java.sql.*;
 import java.util.*;
 
+/**
+ * Handles all database interactions and connection pooling using HikariCP.
+ */
 public class DatabaseManager {
 
     private final SinceBooster plugin;
-    private final boolean isMySQL; // Cache giá trị này
+    private final boolean isMySQL;
     private HikariDataSource dataSource;
 
     public DatabaseManager(SinceBooster plugin) {
         this.plugin = plugin;
-        // Cache ngay từ đầu để không phải check string mỗi lần gọi
         this.isMySQL = plugin.getConfigFile().getString("database.type", "SQLITE").equalsIgnoreCase("MYSQL");
         setupDataSource();
         createTables();
@@ -36,13 +38,14 @@ public class DatabaseManager {
             config.setJdbcUrl("jdbc:mysql://" + host + ":" + port + "/" + db + "?useSSL=false&autoReconnect=true&characterEncoding=UTF-8");
             config.setUsername(user);
             config.setPassword(pass);
-            // Các thuộc tính tối ưu cho MySQL
+
+            // Optimal connection properties for MySQL
             config.addDataSourceProperty("cachePrepStmts", "true");
             config.addDataSourceProperty("prepStmtCacheSize", "250");
             config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
             config.addDataSourceProperty("useServerPrepStmts", "true");
             config.addDataSourceProperty("useLocalSessionState", "true");
-            config.addDataSourceProperty("rewriteBatchedStatements", "true"); // Quan trọng cho việc save hàng loạt
+            config.addDataSourceProperty("rewriteBatchedStatements", "true");
         } else {
             File file = new File(plugin.getDataFolder(), "database.db");
             config.setJdbcUrl("jdbc:sqlite:" + file.getAbsolutePath());
@@ -74,7 +77,6 @@ public class DatabaseManager {
             String usersTable = getUsersTable();
             String boostersTable = getBoostersTable();
 
-            // Sử dụng Text Block cho dễ đọc
             String sqlUsers = """
                     CREATE TABLE IF NOT EXISTS %s (
                         uuid VARCHAR(36) PRIMARY KEY,
@@ -97,7 +99,7 @@ public class DatabaseManager {
             }
 
         } catch (SQLException e) {
-            plugin.getLogger().severe("Could not create database tables!");
+            plugin.getLogger().severe(plugin.getMessagesFile().getString("log.db_create_fail", "Could not create database tables!"));
             e.printStackTrace();
         }
     }
@@ -129,9 +131,10 @@ public class DatabaseManager {
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     UUID ownerId = UUID.fromString(rs.getString("uuid"));
-                    // Kiểm tra chính xác UUID trong chuỗi shared_with để tránh trùng lặp chuỗi con
+
                     String sharedRaw = rs.getString("shared_with");
                     if (!Arrays.asList(sharedRaw.split(",")).contains(receiverId.toString())) continue;
+
                     double offlineRate = rs.getDouble("offline_share_rate");
                     Booster b = new Booster(
                             rs.getString("booster_id"),
@@ -142,8 +145,6 @@ public class DatabaseManager {
                             true, ownerId, offlineRate
                     );
 
-                    // Gán tỷ lệ offline share vào Booster (hoặc xử lý ở ShareManager)
-                    // Ở đây ta chỉ cần trả về Booster, ShareManager sẽ lo phần tính toán
                     result.computeIfAbsent(ownerId, k -> new ArrayList<>()).add(b);
                 }
             }

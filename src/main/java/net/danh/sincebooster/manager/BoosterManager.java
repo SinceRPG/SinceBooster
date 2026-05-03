@@ -10,13 +10,17 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+/**
+ * Core manager responsible for tracking active boosters, caching incoming shared boosters,
+ * and performing logic validations before multiplying player experience.
+ */
 public class BoosterManager {
     private final SinceBooster plugin;
-    // Map: Owner UUID -> List<Booster> (Booster mình sở hữu)
+
+    // Map: Owner UUID -> List of Boosters owned by the player
     private final Map<UUID, List<Booster>> activeBoosters = new ConcurrentHashMap<>();
 
-    // [NEW] Map: Receiver UUID -> List<Booster> (Cache danh sách booster người khác share cho mình)
-    // Giúp tính toán Exp nhanh hơn O(1) thay vì O(N)
+    // Map: Receiver UUID -> Set of incoming shared boosters (O(1) cache for fast experience calculation)
     private final Map<UUID, Set<Booster>> incomingShares = new ConcurrentHashMap<>();
 
     private final ShareManager shareManager;
@@ -30,12 +34,10 @@ public class BoosterManager {
         return shareManager;
     }
 
-    // Được gọi từ PlayerDataHandler khi load xong
     public void loadPlayerBoosters(UUID ownerId, List<Booster> boosters) {
         List<Booster> safeList = new CopyOnWriteArrayList<>(boosters);
         activeBoosters.put(ownerId, safeList);
 
-        // Update cache incomingShares cho những người được share
         for (Booster b : safeList) {
             refreshIncomingCache(b);
         }
@@ -45,7 +47,6 @@ public class BoosterManager {
         List<Booster> removedList = activeBoosters.remove(ownerId);
         if (removedList != null) {
             for (Booster b : removedList) {
-                // Xóa booster này khỏi incomingShares của người nhận
                 for (UUID receiverId : b.getSharedPlayers()) {
                     if (incomingShares.containsKey(receiverId)) {
                         incomingShares.get(receiverId).remove(b);
@@ -55,14 +56,12 @@ public class BoosterManager {
         }
     }
 
-    // Helper: Cập nhật cache khi 1 booster thay đổi danh sách share
     public void refreshIncomingCache(Booster b) {
         for (UUID receiverId : b.getSharedPlayers()) {
             incomingShares.computeIfAbsent(receiverId, k -> ConcurrentHashMap.newKeySet()).add(b);
         }
     }
 
-    // Helper: Xóa 1 người khỏi cache của booster (khi kick/leave)
     public void removeFromIncomingCache(Booster b, UUID receiverId) {
         if (incomingShares.containsKey(receiverId)) {
             incomingShares.get(receiverId).remove(b);
@@ -85,7 +84,7 @@ public class BoosterManager {
 
                 if (bProf.equals(targetProf)) {
                     if (b.isPermanent() && isPermanent) {
-                        list.remove(b); // Xóa để add lại (reset stats) hoặc bỏ qua tùy logic, ở đây giữ nguyên
+                        list.remove(b);
                         break;
                     }
                     if (!b.isPermanent() && !isPermanent) {
@@ -113,20 +112,17 @@ public class BoosterManager {
         String targetProf = (profession == null) ? null : profession.toLowerCase();
         UUID myUUID = p.getUniqueId();
 
-        // 1. BOOSTER CỦA MÌNH
         List<Booster> myList = activeBoosters.get(myUUID);
         if (myList != null) {
             for (Booster b : myList) {
-                if (!b.isValid()) continue; // (Đoạn cleanup giữ nguyên)
+                if (!b.isValid()) continue;
                 if (checkProf(b, targetProf)) {
-                    // GỌI HÀM CHUẨN
                     double finalMult = shareManager.getFinalMultiplier(b, myUUID);
                     totalAdded += (finalMult - 1.0);
                 }
             }
         }
 
-        // 2. BOOSTER ĐƯỢC SHARE
         Set<Booster> sharedWithMe = incomingShares.get(myUUID);
         if (sharedWithMe != null) {
             for (Booster b : sharedWithMe) {
@@ -134,7 +130,6 @@ public class BoosterManager {
                 if (!b.getSharedPlayers().contains(myUUID)) continue;
 
                 if (checkProf(b, targetProf)) {
-                    // GỌI HÀM CHUẨN
                     double finalMult = shareManager.getFinalMultiplier(b, myUUID);
                     totalAdded += (finalMult - 1.0);
                 }
@@ -145,7 +140,7 @@ public class BoosterManager {
     }
 
     public void loadExternalBoosters(UUID ownerId, List<Booster> boosters) {
-        if (activeBoosters.containsKey(ownerId)) return; // Đã có trong bộ nhớ thì thôi
+        if (activeBoosters.containsKey(ownerId)) return;
 
         List<Booster> safeList = new CopyOnWriteArrayList<>(boosters);
         activeBoosters.put(ownerId, safeList);
@@ -154,8 +149,7 @@ public class BoosterManager {
             refreshIncomingCache(b);
         }
 
-        // Log để kiểm tra
-        plugin.getLogger().info("Đã nạp tạm thời " + boosters.size() + " boosters của " + ownerId + " để xử lý chia sẻ offline.");
+        plugin.getLogger().info(plugin.getMessagesFile().getString("log.temp_load_boosters", "Temporarily loaded <count> boosters for <uuid> to process offline sharing.").replace("<count>", String.valueOf(boosters.size())).replace("<uuid>", ownerId.toString()));
     }
 
     private boolean checkProf(Booster b, String targetProf) {
@@ -177,7 +171,6 @@ public class BoosterManager {
         return activeBoosters.get(uuid);
     }
 
-    // Alias cho load/save
     public List<Booster> getBoosters(UUID uuid) {
         return activeBoosters.getOrDefault(uuid, Collections.emptyList());
     }
@@ -199,15 +192,13 @@ public class BoosterManager {
         }
 
         if (toRemove != null) {
-            // 1. Kick tất cả người được share booster này trước khi xóa
-            for (java.util.UUID receiverId : new java.util.ArrayList<>(toRemove.getSharedPlayers())) {
+            for (UUID receiverId : new ArrayList<>(toRemove.getSharedPlayers())) {
                 OfflinePlayer receiver = Bukkit.getPlayer(receiverId);
                 if (receiver != null) {
                     getShareManager().kickShare(target, toRemove.getId(), receiver);
                 }
             }
 
-            // 2. Xóa khỏi danh sách
             boosters.remove(toRemove);
             return true;
         }
@@ -218,8 +209,7 @@ public class BoosterManager {
         List<Booster> boosters = getActiveBoosters(target.getUniqueId());
         if (boosters == null || boosters.isEmpty()) return;
 
-        // Tạo bản sao để tránh ConcurrentModificationException khi loop
-        List<Booster> copy = new java.util.ArrayList<>(boosters);
+        List<Booster> copy = new ArrayList<>(boosters);
 
         for (Booster b : copy) {
             removeBooster(target, b.getId());

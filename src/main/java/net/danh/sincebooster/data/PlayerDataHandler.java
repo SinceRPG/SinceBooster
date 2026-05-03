@@ -15,6 +15,9 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+/**
+ * Handles saving, loading, and memory management for player Booster sessions.
+ */
 public class PlayerDataHandler {
     private final SinceBooster plugin;
     private final Map<UUID, PlayerSession> sessionMap = new ConcurrentHashMap<>();
@@ -31,8 +34,6 @@ public class PlayerDataHandler {
                 if (p.isOnline()) {
                     sessionMap.put(uuid, session);
                     plugin.getBoosterManager().loadPlayerBoosters(uuid, session.getBoosters());
-
-                    // Refresh cache share offline
                     plugin.getBoosterManager().getShareManager().refreshOfflineShares(p);
                 }
             });
@@ -138,7 +139,7 @@ public class PlayerDataHandler {
 
     private void saveSessionToDatabase(UUID uuid, PlayerSession session, List<Booster> boosters) {
         try (Connection conn = plugin.getDatabaseManager().getConnection()) {
-            conn.setAutoCommit(false); // Bắt đầu Transaction
+            conn.setAutoCommit(false);
 
             try {
                 String upsertUser = plugin.getDatabaseManager().isMySQL()
@@ -187,7 +188,7 @@ public class PlayerDataHandler {
 
             } catch (SQLException e) {
                 conn.rollback();
-                plugin.getLogger().severe("Lỗi khi lưu dữ liệu của " + uuid + " - Đã Rollback transaction!");
+                plugin.getLogger().severe(plugin.getMessagesFile().getString("log.db_save_error", "Error saving data for <uuid> - Transaction rolled back!").replace("<uuid>", uuid.toString()));
                 e.printStackTrace();
             } finally {
                 conn.setAutoCommit(true);
