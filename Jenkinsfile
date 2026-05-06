@@ -5,7 +5,7 @@ pipeline {
         // --- DISCORD CONFIGURATION ---
         // Webhook URL and Thread ID derived from project context
         DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1471469221614583810/pfMtLyRbTDKiUGMJyVBjhhJ3RDgQelOX71iMGqWg3HdrlokqBJSt1Ox3aC4yTkkGtZ-_"
-        THREAD_ID = "1492096066340786287"
+        THREAD_ID = "1471468999282786397"
 
         // --- ASSETS ---
         ICON_URL = "https://gitlab.com/uploads/-/system/group/avatar/121690756/SinceRPG.png?width=48"
