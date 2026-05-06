@@ -3,3 +3,6 @@
 /build/
 /build/classes/java/main/
 /.idea/
+config.json
+consolidator.py
+project_context.txt
