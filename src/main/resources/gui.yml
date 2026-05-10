@@ -1,6 +1,8 @@
 # =====================================================
 #             FULL GUI LAYOUT CONFIGURATION
 # =====================================================
+# Powered by ItemBuilder allowing: name, lore, material,
+# custom_model_data, glow, and hide_tooltip
 
 booster_list:
   title: "&0Boosters List"
@@ -19,7 +21,6 @@ booster_list:
     separator:
       material: "BLACK_STAINED_GLASS_PANE"
       name: "&r"
-      lore: [ ]
 
     empty_slot:
       material: "BARRIER"
@@ -134,7 +135,6 @@ share_gui:
         slot: 45
         material: "ARROW"
         name: "&cBack"
-        lore: [ ]
       player_head:
         name: "&e<player_name>"
         lore:
@@ -151,7 +151,6 @@ share_gui:
         slot: 45
         material: "ARROW"
         name: "&cBack"
-        lore: [ ]
       booster:
         name_time: "&6<id> &7(<time>)"
         name_perm: "&d<id> &7(Permanent)"

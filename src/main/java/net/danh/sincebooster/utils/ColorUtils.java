@@ -9,13 +9,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Handles legacy and MiniMessage color code conversions.
+ * Handles legacy and MiniMessage color code conversions efficiently.
  */
 public class ColorUtils {
     private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
     private static final Pattern HEX_PATTERN = Pattern.compile("&#([a-fA-F0-9]{6})");
 
     public static @NotNull Component parse(@NotNull String input) {
+        if (input.isEmpty()) return Component.empty();
         return MINI_MESSAGE.deserialize(convertLegacyToMiniMessage(input));
     }
 
@@ -25,7 +26,7 @@ public class ColorUtils {
     }
 
     public static String convertLegacyToMiniMessage(String text) {
-        if (text == null) return "";
+        if (text == null || text.isEmpty()) return "";
         text = text.replace("§", "&");
         Matcher matcher = HEX_PATTERN.matcher(text);
         StringBuilder buffer = new StringBuilder();
