@@ -103,6 +103,7 @@ public final class SinceBooster extends JavaPlugin {
                 p.closeInventory();
                 p.sendMessage(ColorUtils.parseWithPrefix(messagesFile.getString("booster.gui_closed_on_reload", "Menu closed due to server reload.")));
             }
+            p.closeDialog();
         }
         configFile.reload();
         messagesFile.reload();

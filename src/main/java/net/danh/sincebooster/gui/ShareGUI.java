@@ -1,10 +1,16 @@
 package net.danh.sincebooster.gui;
 
+import io.papermc.paper.dialog.Dialog;
+import io.papermc.paper.registry.data.dialog.ActionButton;
+import io.papermc.paper.registry.data.dialog.DialogBase;
+import io.papermc.paper.registry.data.dialog.action.DialogAction;
+import io.papermc.paper.registry.data.dialog.type.DialogType;
 import net.danh.sincebooster.SinceBooster;
 import net.danh.sincebooster.manager.Booster;
 import net.danh.sincebooster.utils.ColorUtils;
 import net.danh.sincebooster.utils.ConfigUtils;
 import net.danh.sincebooster.utils.ItemBuilder;
+import net.kyori.adventure.text.event.ClickCallback;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -22,12 +28,14 @@ import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 /**
  * Multi-stage GUI for selecting a player and a booster to share.
  * Strictly uses ItemBuilder combined with gui.yml definitions for completely dynamic rendering.
+ * Fully supports modern Paper 1.21.6+ Dialog APIs.
  */
 public class ShareGUI implements Listener {
 
@@ -52,6 +60,51 @@ public class ShareGUI implements Listener {
             p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.no_permission")));
             return;
         }
+
+        if (plugin.getConfigFile().getString("gui.type", "INVENTORY").equalsIgnoreCase("DIALOG")) {
+            openDialogPlayerSelector(p);
+        } else {
+            openInventoryPlayerSelector(p);
+        }
+    }
+
+    private void openDialogPlayerSelector(Player p) {
+        String titleStr = getGui().getString("share_gui.dialog.player_selector.title", "Select a Player");
+        List<ActionButton> buttons = new ArrayList<>();
+        ConfigurationSection headSec = getGui().getConfig().getConfigurationSection("share_gui.dialog.player_selector.player_button");
+
+        for (Player target : Bukkit.getOnlinePlayers()) {
+            if (target.getUniqueId().equals(p.getUniqueId())) continue;
+
+            String name = headSec != null ? headSec.getString("name", "&e<player_name>") : "&e<player_name>";
+            String tooltip = headSec != null ? headSec.getString("tooltip", "&7Click to select this player") : "&7Click to select this player";
+            name = name.replace("<player_name>", target.getName());
+
+            buttons.add(ActionButton.builder(ColorUtils.parse(name))
+                    .tooltip(ColorUtils.parse(tooltip))
+                    .action(DialogAction.customClick((view, audience) -> {
+                        if (audience instanceof Player clicker) {
+                            plugin.getServer().getScheduler().runTask(plugin, () -> {
+                                if (target.isOnline()) {
+                                    openBoosterSelector(clicker, target);
+                                } else {
+                                    clicker.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.invalid_target")));
+                                    clicker.closeDialog();
+                                }
+                            });
+                        }
+                    }, ClickCallback.Options.builder().uses(1).build()))
+                    .build());
+        }
+
+        Dialog dialog = Dialog.create(builder -> builder.empty()
+                .base(DialogBase.builder(ColorUtils.parse(titleStr)).build())
+                .type(DialogType.multiAction(buttons, null, getGui().getInt("share_gui.dialog.player_selector.columns", 3)))
+        );
+        p.showDialog(dialog);
+    }
+
+    private void openInventoryPlayerSelector(Player p) {
         String titleStr = getGui().getString("share_gui.player_selector.title", "Select a Player");
         int size = getGui().getInt("share_gui.player_selector.size", 54);
         PlayerSelectorHolder holder = new PlayerSelectorHolder();
@@ -92,6 +145,90 @@ public class ShareGUI implements Listener {
             p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.no_permission")));
             return;
         }
+
+        if (plugin.getConfigFile().getString("gui.type", "INVENTORY").equalsIgnoreCase("DIALOG")) {
+            openDialogBoosterSelector(p, target);
+        } else {
+            openInventoryBoosterSelector(p, target);
+        }
+    }
+
+    private void openDialogBoosterSelector(Player p, Player target) {
+        String titleStr = getGui().getString("share_gui.dialog.booster_selector.title", "Select a Booster");
+        List<ActionButton> buttons = new ArrayList<>();
+        ConfigurationSection baseSec = getGui().getConfig().getConfigurationSection("share_gui.dialog.booster_selector.booster_button");
+
+        List<Booster> boosters = plugin.getBoosterManager().getActiveBoosters(p.getUniqueId());
+        if (boosters != null) {
+            int maxShare = plugin.getBoosterManager().getShareManager().getPlayerShareLimit(p);
+
+            for (Booster b : boosters) {
+                if (!b.isValid()) continue;
+
+                String keyDur = b.isPermanent() ? "name_perm" : "name_time";
+                long left = (b.getEndTime() - System.currentTimeMillis()) / 1000;
+                String timeStr = formatTime(Math.max(0, left));
+                String id = b.getId().toUpperCase();
+
+                String typeColor = (b.getProfession() == null) ? "<aqua>" : "<green>";
+                String typeName = (b.getProfession() == null) ? "Class XP" : "Job: " + b.getProfession().toUpperCase();
+
+                double baseMult = b.getMultiplier();
+                double receiverRateConfig = plugin.getPlayerDataHandler().getSession(p.getUniqueId()).getReceiverBuffRate();
+                double recEfficiency = receiverRateConfig * 100.0;
+                double recMult = 1.0 + ((baseMult - 1.0) * (recEfficiency / 100.0));
+
+                int currentShare = b.getSharedPlayers().size();
+                boolean isFull = currentShare >= maxShare;
+                String slotColor = isFull ? "<red>" : "<green>";
+                String statusText = "";
+
+                String name = "&6<id> &7(<time>)";
+                String tooltip = "&7Click to share!";
+
+                if (baseSec != null) {
+                    name = baseSec.getString(keyDur, name);
+                    tooltip = baseSec.getString("tooltip", tooltip);
+                    statusText = baseSec.getString(isFull ? "status_full" : "status_available", "");
+                    statusText = statusText.replace("<current>", String.valueOf(currentShare)).replace("<max>", String.valueOf(maxShare));
+
+                    name = name.replace("<id>", id).replace("<time>", timeStr);
+                    tooltip = tooltip.replace("<type_color>", typeColor)
+                            .replace("<type_name>", typeName)
+                            .replace("<multiplier>", String.valueOf(baseMult))
+                            .replace("<percent>", String.valueOf((int) ((baseMult - 1.0) * 100)))
+                            .replace("<rec_multiplier>", String.format("%.2f", recMult))
+                            .replace("<rec_percent>", String.valueOf((int) ((recMult - 1.0) * 100)))
+                            .replace("<slot_color>", slotColor)
+                            .replace("<status_text>", statusText);
+                }
+
+                buttons.add(ActionButton.builder(ColorUtils.parse(name))
+                        .tooltip(ColorUtils.parse(tooltip))
+                        .action(DialogAction.customClick((view, audience) -> {
+                            if (audience instanceof Player clicker) {
+                                plugin.getServer().getScheduler().runTask(plugin, () -> {
+                                    if (target != null && target.isOnline()) {
+                                        plugin.getBoosterManager().getShareManager().sendInvite(clicker, target, b.getId());
+                                    } else {
+                                        clicker.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.invalid_target")));
+                                    }
+                                    clicker.closeDialog();
+                                });
+                            }
+                        }, ClickCallback.Options.builder().uses(1).build()))
+                        .build());
+            }
+        }
+
+        Dialog dialog = Dialog.create(builder -> builder.empty()
+                .base(DialogBase.builder(ColorUtils.parse(titleStr)).build())
+                .type(DialogType.multiAction(buttons, null, getGui().getInt("share_gui.dialog.booster_selector.columns", 3)))
+        );
+        p.showDialog(dialog);
+    }
+
+    private void openInventoryBoosterSelector(Player p, Player target) {
         String titleStr = getGui().getString("share_gui.booster_selector.title", "Select a Booster");
         int size = getGui().getInt("share_gui.booster_selector.size", 54);
         BoosterSelectorHolder holder = new BoosterSelectorHolder(target.getUniqueId());
@@ -196,7 +333,7 @@ public class ShareGUI implements Listener {
             if (item.getType() == Material.PLAYER_HEAD) {
                 SkullMeta meta = (SkullMeta) item.getItemMeta();
                 if (meta != null && meta.getOwningPlayer() != null && meta.getOwningPlayer().isOnline()) {
-                    openBoosterSelector(p, meta.getOwningPlayer().getPlayer());
+                    openInventoryBoosterSelector(p, meta.getOwningPlayer().getPlayer());
                 } else {
                     p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.invalid_target", "&cPlayer is no longer online!")));
                     p.closeInventory();
@@ -209,7 +346,7 @@ public class ShareGUI implements Listener {
             if (e.getClickedInventory() != e.getView().getTopInventory()) return;
 
             if (isBackButton(item, "share_gui.booster_selector.items.back_button.material")) {
-                openPlayerSelector(p);
+                openInventoryPlayerSelector(p);
                 return;
             }
 

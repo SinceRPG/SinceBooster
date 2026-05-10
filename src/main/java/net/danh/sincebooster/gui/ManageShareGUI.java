@@ -1,10 +1,16 @@
 package net.danh.sincebooster.gui;
 
+import io.papermc.paper.dialog.Dialog;
+import io.papermc.paper.registry.data.dialog.ActionButton;
+import io.papermc.paper.registry.data.dialog.DialogBase;
+import io.papermc.paper.registry.data.dialog.action.DialogAction;
+import io.papermc.paper.registry.data.dialog.type.DialogType;
 import net.danh.sincebooster.SinceBooster;
 import net.danh.sincebooster.manager.Booster;
 import net.danh.sincebooster.utils.ColorUtils;
 import net.danh.sincebooster.utils.ConfigUtils;
 import net.danh.sincebooster.utils.ItemBuilder;
+import net.kyori.adventure.text.event.ClickCallback;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -23,12 +29,13 @@ import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 /**
  * GUI for managing players that a specific booster is shared with.
- * Incorporates ItemBuilder logic directly tied to the gui.yml mappings.
+ * Incorporates ItemBuilder logic directly tied to the gui.yml mappings, and supports Dialog API natively.
  */
 public class ManageShareGUI implements Listener {
     private final SinceBooster plugin;
@@ -52,16 +59,57 @@ public class ManageShareGUI implements Listener {
             p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.no_permission")));
             return;
         }
-        Booster booster = null;
-        List<Booster> list = plugin.getBoosterManager().getActiveBoosters(p.getUniqueId());
-        if (list != null) {
-            for (Booster b : list) {
-                if (b.getId().equalsIgnoreCase(boosterId)) {
-                    booster = b;
-                    break;
-                }
-            }
+
+        if (plugin.getConfigFile().getString("gui.type", "INVENTORY").equalsIgnoreCase("DIALOG")) {
+            openDialog(p, boosterId);
+        } else {
+            openInventory(p, boosterId);
         }
+    }
+
+    private void openDialog(Player p, String boosterId) {
+        Booster booster = getBooster(p, boosterId);
+        if (booster == null) return;
+
+        String title = getGui().getString("manage_share.dialog.title", "Manage Shares");
+        List<ActionButton> buttons = new ArrayList<>();
+        ConfigurationSection headSec = getGui().getConfig().getConfigurationSection("manage_share.dialog.player_button");
+
+        if (booster.getSharedPlayers().isEmpty()) {
+            p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("manage_share.dialog.empty_notify", "&cNot sharing with anyone.")));
+            return;
+        }
+
+        for (UUID targetUUID : booster.getSharedPlayers()) {
+            OfflinePlayer target = Bukkit.getOfflinePlayer(targetUUID);
+            String name = headSec != null ? headSec.getString("name", "&cKick: <player>") : "&cKick: <player>";
+            String tooltip = headSec != null ? headSec.getString("tooltip", "&7Click to kick.") : "&7Click to kick.";
+
+            name = name.replace("<player>", target.getName() != null ? target.getName() : "Unknown");
+
+            buttons.add(ActionButton.builder(ColorUtils.parse(name))
+                    .tooltip(ColorUtils.parse(tooltip))
+                    .action(DialogAction.customClick((view, audience) -> {
+                        if (audience instanceof Player clicker) {
+                            plugin.getServer().getScheduler().runTask(plugin, () -> {
+                                plugin.getBoosterManager().getShareManager().kickShare(clicker, boosterId, target);
+                                openDialog(clicker, boosterId);
+                            });
+                        }
+                    }, ClickCallback.Options.builder().uses(1).build()))
+                    .build());
+        }
+
+        Dialog dialog = Dialog.create(builder -> builder.empty()
+                .base(DialogBase.builder(ColorUtils.parse(title)).build())
+                .type(DialogType.multiAction(buttons, null, getGui().getInt("manage_share.dialog.columns", 3)))
+        );
+
+        p.showDialog(dialog);
+    }
+
+    private void openInventory(Player p, String boosterId) {
+        Booster booster = getBooster(p, boosterId);
         if (booster == null) return;
 
         String title = getGui().getString("manage_share.title", "Manage Shares");
@@ -86,6 +134,18 @@ public class ManageShareGUI implements Listener {
         }
 
         p.openInventory(inv);
+    }
+
+    private Booster getBooster(Player p, String boosterId) {
+        List<Booster> list = plugin.getBoosterManager().getActiveBoosters(p.getUniqueId());
+        if (list != null) {
+            for (Booster b : list) {
+                if (b.getId().equalsIgnoreCase(boosterId)) {
+                    return b;
+                }
+            }
+        }
+        return null;
     }
 
     private ItemStack createPlayerHead(OfflinePlayer target) {
@@ -125,7 +185,7 @@ public class ManageShareGUI implements Listener {
                 if (uuidStr != null) {
                     OfflinePlayer target = Bukkit.getOfflinePlayer(UUID.fromString(uuidStr));
                     plugin.getBoosterManager().getShareManager().kickShare(p, holder.getBoosterId(), target);
-                    open(p, holder.getBoosterId());
+                    openInventory(p, holder.getBoosterId());
                 }
             }
         }

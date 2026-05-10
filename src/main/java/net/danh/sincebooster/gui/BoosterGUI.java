@@ -1,11 +1,19 @@
 package net.danh.sincebooster.gui;
 
+import io.papermc.paper.dialog.Dialog;
+import io.papermc.paper.registry.data.dialog.ActionButton;
+import io.papermc.paper.registry.data.dialog.DialogBase;
+import io.papermc.paper.registry.data.dialog.action.DialogAction;
+import io.papermc.paper.registry.data.dialog.body.DialogBody;
+import io.papermc.paper.registry.data.dialog.type.DialogType;
 import net.danh.sincebooster.SinceBooster;
 import net.danh.sincebooster.data.PlayerDataHandler;
 import net.danh.sincebooster.manager.Booster;
 import net.danh.sincebooster.utils.ColorUtils;
 import net.danh.sincebooster.utils.ConfigUtils;
 import net.danh.sincebooster.utils.ItemBuilder;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickCallback;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -28,7 +36,7 @@ import java.util.*;
 
 /**
  * Main GUI class for viewing owned and received boosters.
- * Strictly uses ItemBuilder combined with gui.yml definitions for completely dynamic rendering.
+ * Dynamically constructs the inventory or Dialog mapped completely off the gui.yml config to reduce hardcoding.
  */
 public class BoosterGUI implements Listener {
 
@@ -56,6 +64,8 @@ public class BoosterGUI implements Listener {
         new BukkitRunnable() {
             @Override
             public void run() {
+                if (plugin.getConfigFile().getString("gui.type", "INVENTORY").equalsIgnoreCase("DIALOG")) return;
+
                 for (Player p : Bukkit.getOnlinePlayers()) {
                     Inventory topInv = p.getOpenInventory().getTopInventory();
                     if (topInv.getHolder(false) instanceof BoosterHolder holder) {
@@ -71,6 +81,221 @@ public class BoosterGUI implements Listener {
     }
 
     public void open(Player viewer, Player target) {
+        if (plugin.getConfigFile().getString("gui.type", "INVENTORY").equalsIgnoreCase("DIALOG")) {
+            openDialog(viewer, target);
+        } else {
+            openInventory(viewer, target);
+        }
+    }
+
+    private void openDialog(Player viewer, Player target) {
+        String titleStr;
+        if (viewer.getUniqueId().equals(target.getUniqueId())) {
+            titleStr = getGui().getString("booster_list.dialog.title", "Boosters List");
+        } else {
+            titleStr = getGui().getString("booster_list.dialog.other_title", "Boosters: <target>").replace("<target>", target.getName());
+        }
+
+        List<DisplayBooster> displayList = getDisplayBoosters(target.getUniqueId());
+        displayList.sort(getBoosterComparator());
+
+        List<ActionButton> buttons = new ArrayList<>();
+
+        for (DisplayBooster db : displayList) {
+            buttons.add(createDialogButton(db, viewer));
+        }
+
+        if (viewer.getUniqueId().equals(target.getUniqueId())) {
+            ConfigurationSection shareSec = getGui().getConfig().getConfigurationSection("booster_list.dialog.share_button");
+            if (shareSec != null) {
+                buttons.add(ActionButton.builder(ColorUtils.parse(shareSec.getString("name", "&eShare Booster")))
+                        .tooltip(ColorUtils.parse(shareSec.getString("tooltip", "&7Click to share a booster.")))
+                        .action(DialogAction.customClick((view, audience) -> {
+                            if (audience instanceof Player p) {
+                                plugin.getServer().getScheduler().runTask(plugin, () -> {
+                                    if (!p.hasPermission("sincebooster.share")) {
+                                        p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.no_permission")));
+                                        p.closeDialog();
+                                        return;
+                                    }
+                                    new ShareGUI(plugin).openPlayerSelector(p);
+                                });
+                            }
+                        }, ClickCallback.Options.builder().uses(1).build()))
+                        .build());
+            }
+
+            boolean hasPerm = viewer.hasPermission("sincebooster.share.offline");
+            boolean isEnabled = false;
+            if (hasPerm) {
+                PlayerDataHandler.PlayerSession s = plugin.getPlayerDataHandler().getSession(viewer.getUniqueId());
+                if (s != null) isEnabled = s.isOfflineShareEnabled();
+            }
+
+            String stateKey = !hasPerm ? "no_perm" : (isEnabled ? "enabled" : "disabled");
+            ConfigurationSection offSec = getGui().getConfig().getConfigurationSection("booster_list.dialog.offline_toggle_button." + stateKey);
+
+            if (offSec != null) {
+                buttons.add(ActionButton.builder(ColorUtils.parse(offSec.getString("name", "&7Offline Share")))
+                        .tooltip(ColorUtils.parse(offSec.getString("tooltip", "")))
+                        .action(DialogAction.customClick((view, audience) -> {
+                            if (audience instanceof Player p) {
+                                plugin.getServer().getScheduler().runTask(plugin, () -> {
+                                    if (!p.hasPermission("sincebooster.share.offline")) {
+                                        p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.offline_no_perm")));
+                                        return;
+                                    }
+
+                                    PlayerDataHandler.PlayerSession session = plugin.getPlayerDataHandler().getSession(p.getUniqueId());
+                                    if (session != null) {
+                                        boolean current = session.isOfflineShareEnabled();
+                                        session.setOfflineShareEnabled(!current);
+                                        plugin.getPlayerDataHandler().saveData(p.getUniqueId(), false);
+
+                                        p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString(current ? "share.offline_toggle_off" : "share.offline_toggle_on")));
+                                        openDialog(p, target);
+                                    }
+                                });
+                            }
+                        }, ClickCallback.Options.builder().uses(1).build()))
+                        .build());
+            }
+        }
+
+        List<DialogBody> bodies = new ArrayList<>();
+        double totalAdd = 0;
+        Map<String, Double> profTotals = new HashMap<>();
+
+        for (DisplayBooster db : displayList) {
+            double bonus = displayBoosterBonus(db);
+            if (db.booster.getProfession() == null) {
+                totalAdd += bonus;
+            } else {
+                String p = db.booster.getProfession();
+                profTotals.put(p, profTotals.getOrDefault(p, 0.0) + bonus);
+            }
+        }
+
+        String classSummary = getGui().getString("booster_list.dialog.class_summary", "&aClass XP: &e<total_multiplier>x")
+                .replace("<total_multiplier>", String.format("%.2f", 1.0 + totalAdd))
+                .replace("<total_percent>", String.valueOf((int) (totalAdd * 100)));
+
+        StringBuilder profListBuilder = new StringBuilder();
+        String profFormat = getGui().getString("booster_list.dialog.prof_summary", "&6Profession <profession>: &e<multiplier>x");
+
+        if (profTotals.isEmpty()) {
+            profListBuilder.append(getGui().getString("booster_list.dialog.prof_none", "&7No profession boosters."));
+        } else {
+            for (Map.Entry<String, Double> entry : profTotals.entrySet()) {
+                double val = 1.0 + entry.getValue();
+                String f = profFormat.replace("<profession>", entry.getKey().toUpperCase())
+                        .replace("<multiplier>", String.format("%.2f", val))
+                        .replace("<percent>", String.valueOf((int) (entry.getValue() * 100)));
+                if (!profListBuilder.isEmpty()) profListBuilder.append("\n");
+                profListBuilder.append(f);
+            }
+        }
+
+        bodies.add(DialogBody.plainMessage(ColorUtils.parse(getGui().getString("booster_list.dialog.summary_header", "&lSummaries:"))));
+        bodies.add(DialogBody.plainMessage(ColorUtils.parse(classSummary)));
+        bodies.add(DialogBody.plainMessage(ColorUtils.parse(profListBuilder.toString())));
+
+        int columns = getGui().getInt("booster_list.dialog.columns", 3);
+
+        Dialog dialog = Dialog.create(builder -> builder.empty()
+                .base(DialogBase.builder(ColorUtils.parse(titleStr))
+                        .body(bodies)
+                        .build())
+                .type(DialogType.multiAction(buttons, null, columns))
+        );
+
+        viewer.showDialog(dialog);
+    }
+
+    private ActionButton createDialogButton(DisplayBooster db, Player viewer) {
+        Booster b = db.booster;
+        String keyType = db.isOwner ? "own_button" : "received_button";
+        ConfigurationSection sec = getGui().getConfig().getConfigurationSection("booster_list.dialog." + keyType);
+
+        if (sec == null) {
+            return ActionButton.builder(Component.text(b.getId())).build();
+        }
+
+        long left = (b.getEndTime() - System.currentTimeMillis()) / 1000;
+        String timeStr = formatTime(Math.max(0, left));
+        String id = b.getId().toUpperCase();
+
+        String typeColor = (b.getProfession() == null) ? "<aqua>" : "<green>";
+        String typeName = (b.getProfession() == null) ? "Class XP" : "Job: " + b.getProfession().toUpperCase();
+
+        String name = sec.getString("name", "<id>").replace("<id>", id).replace("<time>", timeStr);
+        String tooltip = sec.getString("tooltip", "");
+
+        if (db.isOwner) {
+            double decayRate = 1.0;
+            double efficiency = 100.0;
+            if (!b.getSharedPlayers().isEmpty()) {
+                if (b.isPermanent()) {
+                    efficiency = plugin.getBoosterManager().getShareManager().getOwnerBuffRate(db.ownerUUID) * 100.0;
+                } else {
+                    Player p = Bukkit.getPlayer(db.ownerUUID);
+                    if (p != null) decayRate = plugin.getBoosterManager().getShareManager().getDecayRate(p);
+                    else decayRate = plugin.getConfigFile().getDouble("share.default-rate", 2.0);
+                }
+            }
+
+            tooltip = tooltip.replace("<type_color>", typeColor)
+                    .replace("<type_name>", typeName)
+                    .replace("<multiplier>", String.valueOf(b.getMultiplier()))
+                    .replace("<percent>", String.valueOf((int) ((b.getMultiplier() - 1) * 100)))
+                    .replace("<decay_rate>", String.format("%.1f", decayRate))
+                    .replace("<efficiency>", String.format("%.0f", efficiency))
+                    .replace("<shared_count>", String.valueOf(b.getSharedPlayers().size()));
+
+            return ActionButton.builder(ColorUtils.parse(name))
+                    .tooltip(ColorUtils.parse(tooltip))
+                    .action(DialogAction.customClick((view, audience) -> {
+                        if (audience instanceof Player p) {
+                            plugin.getServer().getScheduler().runTask(plugin, () -> {
+                                if (!p.hasPermission("sincebooster.share")) {
+                                    p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.no_permission")));
+                                    return;
+                                }
+                                new ManageShareGUI(plugin).open(p, b.getId());
+                            });
+                        }
+                    }, ClickCallback.Options.builder().uses(1).build()))
+                    .build();
+
+        } else {
+            double baseMult = b.getMultiplier();
+            double currentRate = plugin.getBoosterManager().getShareManager().getReceiverMultiplier(b, viewer.getUniqueId());
+            double efficiency = currentRate * 100.0;
+            double realMult = 1.0 + ((baseMult - 1.0) * currentRate);
+
+            tooltip = tooltip.replace("<type_color>", typeColor)
+                    .replace("<type_name>", typeName)
+                    .replace("<owner_name>", db.ownerName)
+                    .replace("<base_multiplier>", String.valueOf(baseMult))
+                    .replace("<efficiency>", String.format("%.0f", efficiency))
+                    .replace("<real_multiplier>", String.format("%.2f", realMult));
+
+            return ActionButton.builder(ColorUtils.parse(name))
+                    .tooltip(ColorUtils.parse(tooltip))
+                    .action(DialogAction.customClick((view, audience) -> {
+                        if (audience instanceof Player p) {
+                            plugin.getServer().getScheduler().runTask(plugin, () -> {
+                                OfflinePlayer owner = Bukkit.getOfflinePlayer(db.ownerUUID);
+                                plugin.getBoosterManager().getShareManager().leaveShare(p, owner);
+                                p.closeDialog();
+                            });
+                        }
+                    }, ClickCallback.Options.builder().uses(1).build()))
+                    .build();
+        }
+    }
+
+    private void openInventory(Player viewer, Player target) {
         String titleStr;
         if (viewer.getUniqueId().equals(target.getUniqueId())) {
             titleStr = getGui().getString("booster_list.title", "Boosters List");
@@ -87,7 +312,7 @@ public class BoosterGUI implements Listener {
         viewer.openInventory(inv);
     }
 
-    private void updateContent(Inventory inv, UUID targetUUID, Player viewer) {
+    private List<DisplayBooster> getDisplayBoosters(UUID targetUUID) {
         List<DisplayBooster> displayList = new ArrayList<>();
 
         List<Booster> ownList = plugin.getBoosterManager().getActiveBoosters(targetUUID);
@@ -131,6 +356,22 @@ public class BoosterGUI implements Listener {
             }
         }
 
+        return displayList;
+    }
+
+    private Comparator<DisplayBooster> getBoosterComparator() {
+        return (d1, d2) -> {
+            if (d1.isOwner && !d2.isOwner) return -1;
+            if (!d1.isOwner && d2.isOwner) return 1;
+            if (d1.booster.isPermanent() && !d2.booster.isPermanent()) return -1;
+            if (!d1.booster.isPermanent() && d2.booster.isPermanent()) return 1;
+            return Long.compare(d1.booster.getEndTime(), d2.booster.getEndTime());
+        };
+    }
+
+    private void updateContent(Inventory inv, UUID targetUUID, Player viewer) {
+        List<DisplayBooster> displayList = getDisplayBoosters(targetUUID);
+
         List<DisplayBooster> classBoosters = new ArrayList<>();
         List<DisplayBooster> profBoosters = new ArrayList<>();
 
@@ -139,13 +380,7 @@ public class BoosterGUI implements Listener {
             else profBoosters.add(db);
         }
 
-        Comparator<DisplayBooster> sorter = (d1, d2) -> {
-            if (d1.isOwner && !d2.isOwner) return -1;
-            if (!d1.isOwner && d2.isOwner) return 1;
-            if (d1.booster.isPermanent() && !d2.booster.isPermanent()) return -1;
-            if (!d1.booster.isPermanent() && d2.booster.isPermanent()) return 1;
-            return Long.compare(d1.booster.getEndTime(), d2.booster.getEndTime());
-        };
+        Comparator<DisplayBooster> sorter = getBoosterComparator();
         classBoosters.sort(sorter);
         profBoosters.sort(sorter);
 

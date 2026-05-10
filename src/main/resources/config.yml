@@ -14,6 +14,11 @@ database:
   table_users: "sincebooster_users"
   table_boosters: "sincebooster_boosters"
 
+gui:
+  # Use "INVENTORY" for the traditional Minecraft Chest UI.
+  # Use "DIALOG" for the modern Minecraft 1.21.6+ Custom Dialog menus.
+  type: "INVENTORY"
+
 share:
   # Decay rate of time when sharing a Booster with other players.
   # Example: 2.0 means the Booster will expire twice as fast when shared.
