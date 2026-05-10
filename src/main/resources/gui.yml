@@ -1,8 +1,23 @@
 # =====================================================
 #             FULL GUI LAYOUT CONFIGURATION
 # =====================================================
-# Powered by ItemBuilder allowing: name, lore, material,
-# custom_model_data, glow, and hide_tooltip
+# Powered by an Advanced 1.21.x ItemBuilder.
+# You can use the following options on ANY item below:
+#
+# material: "DIAMOND_SWORD"
+# name: "&eItem Name"
+# lore:
+#   - "&7Line 1"
+# custom-model-data: 1234
+# item-model: "minecraft:custom_sword"
+# glowing: true (adds fake enchant glint)
+# hide-tooltip: true
+# flags:
+#   - HIDE_ENCHANTS
+#   - HIDE_ATTRIBUTES
+# enchants:
+#   sharpness: 5
+# =====================================================
 
 booster_list:
   title: "&0Boosters List"
@@ -12,6 +27,7 @@ booster_list:
   formats:
     time_left: "&f<day>d <hour>h <min>m <sec>s"
 
+  # Define exactly which slots should contain which items
   layout:
     class_boosters: [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 ]
     prof_boosters: [ 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44 ]
@@ -21,6 +37,8 @@ booster_list:
     separator:
       material: "BLACK_STAINED_GLASS_PANE"
       name: "&r"
+      hide-tooltip: true
+      # custom-model-data: 100
 
     empty_slot:
       material: "BARRIER"
@@ -32,6 +50,7 @@ booster_list:
       slot: 21
       material: "BEACON"
       name: "&aClass XP Summary"
+      glowing: true
       lore:
         - "&7Total Multiplier: &e<total_multiplier>x &7(+<total_percent>%)"
         - ""
@@ -43,6 +62,7 @@ booster_list:
       slot: 23
       material: "KNOWLEDGE_BOOK"
       name: "&6Profession XP Summary"
+      glowing: true
       prof_format: "&7- <profession>: &e<multiplier>x &7(+<percent>%)"
       prof_none: "&7No active profession boosters."
       lore:
@@ -65,6 +85,7 @@ booster_list:
       enabled:
         name: "&aOffline Share: &2ON"
         material: "LIME_DYE"
+        glowing: true
         lore:
           - "&7Boosters will remain active for"
           - "&7shared receivers when you log off."
@@ -87,12 +108,17 @@ booster_list:
           - ""
           - "&cRequirement: sincebooster.share.offline"
 
+    # Status Strings replacing placeholders inside 'own' and 'received' items
     status_perm: "&aActive"
     status_time: "&eExpires in: &f<time_left>"
     shared_list_none: "&7- (None)"
     shared_list_format: "&7- &f<player>"
 
+    # Item format for boosters YOU own
     own:
+      # Optional: Override the base material here. If removed, the Java code
+      # defaults to NETHER_STAR / ENCHANTED_BOOK based on profession.
+      # material: "NETHER_STAR"
       name_time: "&6<id> &7(Left: <time>)"
       name_perm: "&d&lPERM: &6<id> &7(Permanent)"
       lore:
@@ -109,7 +135,9 @@ booster_list:
         - ""
         - "&eClick &7to manage shares."
 
+    # Item format for boosters SHARED WITH you
     received:
+      # material: "EXPERIENCE_BOTTLE"
       name_time: "&bShared: &f<id> &7(<time>)"
       name_perm: "&bShared: &dPERM &f<id>"
       lore:
@@ -124,6 +152,9 @@ booster_list:
         - ""
         - "&cShift + Click &7to cancel share."
 
+# =====================================================
+# SHARE MENU
+# =====================================================
 share_gui:
   player_selector:
     title: "&0Select Receiver"
@@ -165,6 +196,9 @@ share_gui:
           - ""
           - "&eClick to send invite!"
 
+# =====================================================
+# MANAGE SHARE MENU
+# =====================================================
 manage_share:
   title: "&0Manage Shares"
   size: 27
