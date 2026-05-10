@@ -133,17 +133,23 @@ public class ItemBuilder {
             List<String> rawLore = cfg.getStringList("lore");
             List<Component> compLore = new ArrayList<>();
             for (String line : rawLore) {
+                String replacedLine = line;
                 for (int i = 0; i < replacements.length; i += 2) {
                     if (replacements[i] != null && replacements[i + 1] != null) {
-                        line = line.replace(replacements[i], replacements[i + 1]);
+                        replacedLine = replacedLine.replace(replacements[i], replacements[i + 1]);
                     }
                 }
-                if (line.contains("\n")) {
-                    for (String split : line.split("\n")) {
+
+                if (replacedLine.contains("<br>")) {
+                    for (String split : replacedLine.split("<br>")) {
+                        compLore.add(ColorUtils.parse(split).decoration(TextDecoration.ITALIC, false));
+                    }
+                } else if (replacedLine.contains("\n")) {
+                    for (String split : replacedLine.split("\n")) {
                         compLore.add(ColorUtils.parse(split).decoration(TextDecoration.ITALIC, false));
                     }
                 } else {
-                    compLore.add(ColorUtils.parse(line).decoration(TextDecoration.ITALIC, false));
+                    compLore.add(ColorUtils.parse(replacedLine).decoration(TextDecoration.ITALIC, false));
                 }
             }
             meta.lore(compLore);

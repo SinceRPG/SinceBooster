@@ -108,7 +108,7 @@ public class BoosterGUI implements Listener {
         if (viewer.getUniqueId().equals(target.getUniqueId())) {
             ConfigurationSection shareSec = getGui().getConfig().getConfigurationSection("booster_list.dialog.share_button");
             if (shareSec != null) {
-                String tooltip = shareSec.isList("tooltip") ? String.join("\n", shareSec.getStringList("tooltip")) : shareSec.getString("tooltip", "&7Click to share a booster.");
+                String tooltip = shareSec.isList("tooltip") ? String.join("<br>", shareSec.getStringList("tooltip")) : shareSec.getString("tooltip", "&7Click to share a booster.");
                 buttons.add(ActionButton.builder(ColorUtils.parse(shareSec.getString("name", "&eShare Booster")))
                         .tooltip(ColorUtils.parse(tooltip))
                         .action(DialogAction.customClick((view, audience) -> {
@@ -137,7 +137,7 @@ public class BoosterGUI implements Listener {
             ConfigurationSection offSec = getGui().getConfig().getConfigurationSection("booster_list.dialog.offline_toggle_button." + stateKey);
 
             if (offSec != null) {
-                String tooltip = offSec.isList("tooltip") ? String.join("\n", offSec.getStringList("tooltip")) : offSec.getString("tooltip", "");
+                String tooltip = offSec.isList("tooltip") ? String.join("<br>", offSec.getStringList("tooltip")) : offSec.getString("tooltip", "");
                 buttons.add(ActionButton.builder(ColorUtils.parse(offSec.getString("name", "&7Offline Share")))
                         .tooltip(ColorUtils.parse(tooltip))
                         .action(DialogAction.customClick((view, audience) -> {
@@ -167,7 +167,7 @@ public class BoosterGUI implements Listener {
         if (buttons.isEmpty()) {
             ConfigurationSection emptyBtnSec = getGui().getConfig().getConfigurationSection("booster_list.dialog.empty_button");
             String emptyName = emptyBtnSec != null ? emptyBtnSec.getString("name", "&cNo Boosters") : "&cNo Boosters";
-            String emptyTooltip = emptyBtnSec != null ? (emptyBtnSec.isList("tooltip") ? String.join("\n", emptyBtnSec.getStringList("tooltip")) : emptyBtnSec.getString("tooltip", "&7Nothing to show here.")) : "&7Nothing to show here.";
+            String emptyTooltip = emptyBtnSec != null ? (emptyBtnSec.isList("tooltip") ? String.join("<br>", emptyBtnSec.getStringList("tooltip")) : emptyBtnSec.getString("tooltip", "&7Nothing to show here.")) : "&7Nothing to show here.";
 
             buttons.add(ActionButton.builder(ColorUtils.parse(emptyName))
                     .tooltip(ColorUtils.parse(emptyTooltip))
@@ -240,8 +240,9 @@ public class BoosterGUI implements Listener {
         String typeColor = (b.getProfession() == null) ? "<aqua>" : "<green>";
         String typeName = (b.getProfession() == null) ? "Class XP" : "Job: " + b.getProfession().toUpperCase();
 
-        String name = sec.getString("name", "<id>").replace("<id>", id).replace("<time>", timeStr);
-        String tooltip = sec.isList("tooltip") ? String.join("\n", sec.getStringList("tooltip")) : sec.getString("tooltip", "");
+        String nameFormatKey = b.isPermanent() ? "name_perm" : "name_time";
+        String name = sec.getString(nameFormatKey, "&6<id> &7(<time>)").replace("<id>", id).replace("<time>", timeStr);
+        String tooltip = sec.isList("tooltip") ? String.join("<br>", sec.getStringList("tooltip")) : sec.getString("tooltip", "");
 
         if (db.isOwner) {
             double decayRate = 1.0;
@@ -265,9 +266,11 @@ public class BoosterGUI implements Listener {
                     OfflinePlayer op = Bukkit.getOfflinePlayer(uid);
                     String pName = (op.getName() != null) ? op.getName() : "Unknown";
                     String format = getGui().getString("booster_list.items.shared_list_format", "&7- &f<player>");
-                    sb.append(format.replace("<player>", pName)).append("\n");
+                    sb.append(format.replace("<player>", pName)).append("<br>");
                 }
                 sharedListStr = sb.toString().trim();
+                if (sharedListStr.endsWith("<br>"))
+                    sharedListStr = sharedListStr.substring(0, sharedListStr.length() - 4);
             }
 
             tooltip = tooltip.replace("<type_color>", typeColor)
@@ -278,6 +281,10 @@ public class BoosterGUI implements Listener {
                     .replace("<efficiency>", String.format("%.0f", efficiency))
                     .replace("<shared_count>", String.valueOf(b.getSharedPlayers().size()))
                     .replace("<shared_list>", sharedListStr);
+
+            String statusPath = b.isPermanent() ? "booster_list.items.status_perm" : "booster_list.items.status_time";
+            String status = getGui().getString(statusPath).replace("<time_left>", timeStr);
+            tooltip = tooltip.replace("<status>", status);
 
             return ActionButton.builder(ColorUtils.parse(name))
                     .tooltip(ColorUtils.parse(tooltip))
@@ -306,6 +313,10 @@ public class BoosterGUI implements Listener {
                     .replace("<base_multiplier>", String.valueOf(baseMult))
                     .replace("<efficiency>", String.format("%.0f", efficiency))
                     .replace("<real_multiplier>", String.format("%.2f", realMult));
+
+            String statusPath = b.isPermanent() ? "booster_list.items.status_perm" : "booster_list.items.status_time";
+            String status = getGui().getString(statusPath).replace("<time_left>", timeStr);
+            tooltip = tooltip.replace("<status>", status);
 
             return ActionButton.builder(ColorUtils.parse(name))
                     .tooltip(ColorUtils.parse(tooltip))
@@ -529,9 +540,11 @@ public class BoosterGUI implements Listener {
                         OfflinePlayer op = Bukkit.getOfflinePlayer(uid);
                         String pName = (op.getName() != null) ? op.getName() : "Unknown";
                         String format = getGui().getString("booster_list.items.shared_list_format", "&7- &f<player>");
-                        sb.append(format.replace("<player>", pName)).append("\n");
+                        sb.append(format.replace("<player>", pName)).append("<br>");
                     }
                     sharedListStr = sb.toString().trim();
+                    if (sharedListStr.endsWith("<br>"))
+                        sharedListStr = sharedListStr.substring(0, sharedListStr.length() - 4);
                 }
 
                 builder.applyConfig(baseSec, baseName,
@@ -616,7 +629,7 @@ public class BoosterGUI implements Listener {
                 String f = format.replace("<profession>", entry.getKey().toUpperCase())
                         .replace("<multiplier>", String.format("%.2f", val))
                         .replace("<percent>", String.valueOf((int) (entry.getValue() * 100)));
-                if (!profListBuilder.isEmpty()) profListBuilder.append("\n");
+                if (!profListBuilder.isEmpty()) profListBuilder.append("<br>");
                 profListBuilder.append(f);
             }
         }
@@ -783,4 +796,3 @@ public class BoosterGUI implements Listener {
         }
     }
 }
-

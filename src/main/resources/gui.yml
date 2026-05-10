@@ -183,7 +183,7 @@ booster_list:
           - "&cRequirement: sincebooster.share.offline"
 
     own_button:
-      name: "&6<id> &7(<time>)"
+      name_time: "&6<id> &7(<time>)"
       name_perm: "&d<id> &7(PERM)"
       tooltip:
         - "&7Type: <type_color><type_name>"
@@ -200,7 +200,7 @@ booster_list:
         - "&eClick &7to manage shares."
 
     received_button:
-      name: "&b<id> &7(<time>)"
+      name_time: "&b<id> &7(<time>)"
       name_perm: "&b<id> &7(PERM)"
       tooltip:
         - "&7Owner: &f<owner_name>"

@@ -77,7 +77,7 @@ public class ShareGUI implements Listener {
             if (target.getUniqueId().equals(p.getUniqueId())) continue;
 
             String name = headSec != null ? headSec.getString("name", "&e<player_name>") : "&e<player_name>";
-            String tooltip = headSec != null ? (headSec.isList("tooltip") ? String.join("\n", headSec.getStringList("tooltip")) : headSec.getString("tooltip", "&7Click to select this player")) : "&7Click to select this player";
+            String tooltip = headSec != null ? (headSec.isList("tooltip") ? String.join("<br>", headSec.getStringList("tooltip")) : headSec.getString("tooltip", "&7Click to select this player")) : "&7Click to select this player";
             name = name.replace("<player_name>", target.getName());
 
             buttons.add(ActionButton.builder(ColorUtils.parse(name))
@@ -175,7 +175,7 @@ public class ShareGUI implements Listener {
             for (Booster b : boosters) {
                 if (!b.isValid()) continue;
 
-                String keyDur = b.isPermanent() ? "name_perm" : "name_time";
+                String nameFormatKey = b.isPermanent() ? "name_perm" : "name_time";
                 long left = (b.getEndTime() - System.currentTimeMillis()) / 1000;
                 String timeStr = formatTime(Math.max(0, left));
                 String id = b.getId().toUpperCase();
@@ -197,8 +197,8 @@ public class ShareGUI implements Listener {
                 String tooltip = "&7Click to share!";
 
                 if (baseSec != null) {
-                    name = baseSec.getString(keyDur, name);
-                    if (baseSec.isList("tooltip")) tooltip = String.join("\n", baseSec.getStringList("tooltip"));
+                    name = baseSec.getString(nameFormatKey, name);
+                    if (baseSec.isList("tooltip")) tooltip = String.join("<br>", baseSec.getStringList("tooltip"));
                     else tooltip = baseSec.getString("tooltip", tooltip);
 
                     statusText = baseSec.getString(isFull ? "status_full" : "status_available", "");
