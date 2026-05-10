@@ -12,10 +12,7 @@ import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.enchantments.Enchantment;
-import org.bukkit.inventory.EquipmentSlotGroup;
-import org.bukkit.inventory.ItemFlag;
-import org.bukkit.inventory.ItemRarity;
-import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.*;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.components.*;
@@ -276,7 +273,7 @@ public class ItemBuilder {
         if (cfg.contains("equippable")) {
             try {
                 EquippableComponent eq = meta.getEquippable();
-                eq.setSlot(org.bukkit.inventory.EquipmentSlot.valueOf(cfg.getString("equippable.slot", "HEAD").toUpperCase()));
+                eq.setSlot(EquipmentSlot.valueOf(cfg.getString("equippable.slot", "HEAD").toUpperCase()));
                 meta.setEquippable(eq);
             } catch (Throwable ignored) {
             }

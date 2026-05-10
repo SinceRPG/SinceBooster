@@ -77,7 +77,7 @@ public class ShareGUI implements Listener {
             if (target.getUniqueId().equals(p.getUniqueId())) continue;
 
             String name = headSec != null ? headSec.getString("name", "&e<player_name>") : "&e<player_name>";
-            String tooltip = headSec != null ? headSec.getString("tooltip", "&7Click to select this player") : "&7Click to select this player";
+            String tooltip = headSec != null ? (headSec.isList("tooltip") ? String.join("\n", headSec.getStringList("tooltip")) : headSec.getString("tooltip", "&7Click to select this player")) : "&7Click to select this player";
             name = name.replace("<player_name>", target.getName());
 
             buttons.add(ActionButton.builder(ColorUtils.parse(name))
@@ -198,7 +198,9 @@ public class ShareGUI implements Listener {
 
                 if (baseSec != null) {
                     name = baseSec.getString(keyDur, name);
-                    tooltip = baseSec.getString("tooltip", tooltip);
+                    if (baseSec.isList("tooltip")) tooltip = String.join("\n", baseSec.getStringList("tooltip"));
+                    else tooltip = baseSec.getString("tooltip", tooltip);
+
                     statusText = baseSec.getString(isFull ? "status_full" : "status_available", "");
                     statusText = statusText.replace("<current>", String.valueOf(currentShare)).replace("<max>", String.valueOf(maxShare));
 
@@ -218,7 +220,7 @@ public class ShareGUI implements Listener {
                         .action(DialogAction.customClick((view, audience) -> {
                             if (audience instanceof Player clicker) {
                                 plugin.getServer().getScheduler().runTask(plugin, () -> {
-                                    if (target.isOnline()) {
+                                    if (target != null && target.isOnline()) {
                                         plugin.getBoosterManager().getShareManager().sendInvite(clicker, target, b.getId());
                                     } else {
                                         clicker.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.invalid_target")));

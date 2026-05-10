@@ -1,5 +1,5 @@
 name: SinceBooster
-version: '1.1'
+version: '${version}'
 main: net.danh.sincebooster.SinceBooster
 api-version: '1.21'
 authors: [ VoChiDanh ]

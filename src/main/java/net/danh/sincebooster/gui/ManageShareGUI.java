@@ -83,7 +83,7 @@ public class ManageShareGUI implements Listener {
         for (UUID targetUUID : booster.getSharedPlayers()) {
             OfflinePlayer target = Bukkit.getOfflinePlayer(targetUUID);
             String name = headSec != null ? headSec.getString("name", "&cKick: <player>") : "&cKick: <player>";
-            String tooltip = headSec != null ? headSec.getString("tooltip", "&7Click to kick.") : "&7Click to kick.";
+            String tooltip = headSec != null ? (headSec.isList("tooltip") ? String.join("\n", headSec.getStringList("tooltip")) : headSec.getString("tooltip", "&7Click to kick.")) : "&7Click to kick.";
 
             name = name.replace("<player>", target.getName() != null ? target.getName() : "Unknown");
 
@@ -97,6 +97,16 @@ public class ManageShareGUI implements Listener {
                             });
                         }
                     }, ClickCallback.Options.builder().uses(1).build()))
+                    .build());
+        }
+
+        if (buttons.isEmpty()) {
+            ConfigurationSection emptyBtnSec = getGui().getConfig().getConfigurationSection("manage_share.dialog.empty_button");
+            String emptyName = emptyBtnSec != null ? emptyBtnSec.getString("name", "&cNot Sharing") : "&cNot Sharing";
+            String emptyTooltip = emptyBtnSec != null ? (emptyBtnSec.isList("tooltip") ? String.join("\n", emptyBtnSec.getStringList("tooltip")) : emptyBtnSec.getString("tooltip", "&7Nothing to show here.")) : "&7Nothing to show here.";
+
+            buttons.add(ActionButton.builder(ColorUtils.parse(emptyName))
+                    .tooltip(ColorUtils.parse(emptyTooltip))
                     .build());
         }
 

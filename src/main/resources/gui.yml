@@ -160,32 +160,59 @@ booster_list:
 
     empty_button:
       name: "&cNo Boosters"
-      tooltip: "&7Nothing to show here."
+      tooltip:
+        - "&7Nothing to show here."
 
     share_button:
       name: "&e&lShare Booster"
-      tooltip: "&7Click to share a booster with others."
+      tooltip:
+        - "&7Click to share a booster with others."
 
     offline_toggle_button:
       enabled:
         name: "&aOffline: ON"
-        tooltip: "&eClick to DISABLE offline sharing."
+        tooltip:
+          - "&eClick to DISABLE offline sharing."
       disabled:
         name: "&cOffline: OFF"
-        tooltip: "&eClick to ENABLE offline sharing."
+        tooltip:
+          - "&eClick to ENABLE offline sharing."
       no_perm:
         name: "&7Offline: Locked"
-        tooltip: "&cRequirement: sincebooster.share.offline"
+        tooltip:
+          - "&cRequirement: sincebooster.share.offline"
 
     own_button:
       name: "&6<id> &7(<time>)"
       name_perm: "&d<id> &7(PERM)"
-      tooltip: "&7Type: <type_color><type_name>\n&7Multiplier: &e+<percent>%\n&7Shared with: <shared_count>\n&eClick to manage shares."
+      tooltip:
+        - "&7Type: <type_color><type_name>"
+        - "&7Multiplier: &e+<percent>%"
+        - ""
+        - "&7Status: <status>"
+        - "&7Sharing with: &f<shared_count> players"
+        - "&7Decay Rate: &c<decay_rate>x/s"
+        - "&7Personal Efficiency: &a<efficiency>%"
+        - ""
+        - "&fShared With:"
+        - "<shared_list>"
+        - ""
+        - "&eClick &7to manage shares."
 
     received_button:
       name: "&b<id> &7(<time>)"
       name_perm: "&b<id> &7(PERM)"
-      tooltip: "&7Owner: &f<owner_name>\n&7Type: <type_color><type_name>\n&7Real Multiplier: &e+<real_multiplier>x\n&cClick to cancel share."
+      tooltip:
+        - "&7Owner: &f<owner_name>"
+        - "&7Type: <type_color><type_name>"
+        - "&7Base Multiplier: &e+<base_multiplier>x"
+        - ""
+        - "&7Receiver Efficiency: &b<efficiency>%"
+        - "&7Actual Multiplier: &a+<real_multiplier>x"
+        - ""
+        - "&7Status: <status>"
+        - ""
+        - "&cShift + Click &7to cancel share."
 
 # =====================================================
 # SHARE MENU
@@ -243,7 +270,8 @@ share_gui:
       columns: 4
       player_button:
         name: "&e<player_name>"
-        tooltip: "&7Click to select this player."
+        tooltip:
+          - "&7Click to select this player."
 
     booster_selector:
       title: "&0Select Booster to Share"
@@ -253,7 +281,14 @@ share_gui:
         name_perm: "&d<id> &7(Permanent)"
         status_full: "&cFull (<current>/<max>)"
         status_available: "&aAvailable (<current>/<max>)"
-        tooltip: "&7Type: <type_color><type_name>\n&7Slots: <slot_color><status_text>\n\n&eClick to share!"
+        tooltip:
+          - "&7Type: <type_color><type_name>"
+          - "&7Multiplier: &e<multiplier>x &7(+<percent>%)"
+          - ""
+          - "&7Receiver will get: &b<rec_multiplier>x &7(+<rec_percent>%)"
+          - "&7Slots: <slot_color><status_text>"
+          - ""
+          - "&eClick to send invite!"
 
 # =====================================================
 # MANAGE SHARE MENU
@@ -287,6 +322,11 @@ manage_share:
     title: "&0Manage Shares"
     columns: 4
     empty_notify: "&cThis booster is not being shared with anyone."
+    empty_button:
+      name: "&cNot Sharing"
+      tooltip:
+        - "&7Nothing to show here."
     player_button:
       name: "&cKick: <player>"
-      tooltip: "&7Click to revoke this player's access."
+      tooltip:
+        - "&7Click to revoke this player's access."
