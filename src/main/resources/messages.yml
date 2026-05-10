@@ -16,6 +16,7 @@ admin:
 share:
   invalid_target: "&cInvalid target."
   self_interaction: "&cYou cannot perform this action on yourself."
+  no_players: "&cNo other players are currently online."
   no_boosters_to_share: "&cYou do not have any active boosters available to share."
   invite_sent: "&aSent a share invite for &e<booster_display> &ato &b<target>&a. Expires in <time>s."
   invite_received: "&b<player> &awants to share &e<booster_display> &awith you. Type &6/booster accept <player> &ato accept."

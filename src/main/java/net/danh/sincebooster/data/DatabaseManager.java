@@ -43,7 +43,6 @@ public class DatabaseManager {
             config.setUsername(user);
             config.setPassword(pass);
 
-            // Optimal connection properties for MySQL to prevent JIT and GC lag spikes
             config.addDataSourceProperty("cachePrepStmts", "true");
             config.addDataSourceProperty("prepStmtCacheSize", "250");
             config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
@@ -115,7 +114,6 @@ public class DatabaseManager {
             try {
                 stmt.execute("CREATE INDEX IF NOT EXISTS idx_booster_uuid ON " + boostersTable + " (uuid);");
             } catch (SQLException ignored) {
-                // Index might already exist
             }
 
         } catch (SQLException e) {

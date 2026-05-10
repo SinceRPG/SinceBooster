@@ -162,6 +162,16 @@ public class BoosterGUI implements Listener {
             }
         }
 
+        if (buttons.isEmpty()) {
+            ConfigurationSection emptyBtnSec = getGui().getConfig().getConfigurationSection("booster_list.dialog.empty_button");
+            String emptyName = emptyBtnSec != null ? emptyBtnSec.getString("name", "&cNo Boosters") : "&cNo Boosters";
+            String emptyTooltip = emptyBtnSec != null ? emptyBtnSec.getString("tooltip", "&7Nothing to show here.") : "&7Nothing to show here.";
+
+            buttons.add(ActionButton.builder(ColorUtils.parse(emptyName))
+                    .tooltip(ColorUtils.parse(emptyTooltip))
+                    .build());
+        }
+
         List<DialogBody> bodies = new ArrayList<>();
         double totalAdd = 0;
         Map<String, Double> profTotals = new HashMap<>();

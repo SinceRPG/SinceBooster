@@ -97,6 +97,11 @@ public class ShareGUI implements Listener {
                     .build());
         }
 
+        if (buttons.isEmpty()) {
+            p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.no_players", "&cNo other players are currently online.")));
+            return;
+        }
+
         Dialog dialog = Dialog.create(builder -> builder.empty()
                 .base(DialogBase.builder(ColorUtils.parse(titleStr)).build())
                 .type(DialogType.multiAction(buttons, null, getGui().getInt("share_gui.dialog.player_selector.columns", 3)))
@@ -143,6 +148,11 @@ public class ShareGUI implements Listener {
     public void openBoosterSelector(Player p, Player target) {
         if (!p.hasPermission("sincebooster.share")) {
             p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.no_permission")));
+            return;
+        }
+
+        if (target == null || !target.isOnline()) {
+            p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.invalid_target")));
             return;
         }
 
@@ -208,7 +218,7 @@ public class ShareGUI implements Listener {
                         .action(DialogAction.customClick((view, audience) -> {
                             if (audience instanceof Player clicker) {
                                 plugin.getServer().getScheduler().runTask(plugin, () -> {
-                                    if (target != null && target.isOnline()) {
+                                    if (target.isOnline()) {
                                         plugin.getBoosterManager().getShareManager().sendInvite(clicker, target, b.getId());
                                     } else {
                                         clicker.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.invalid_target")));
@@ -219,6 +229,11 @@ public class ShareGUI implements Listener {
                         }, ClickCallback.Options.builder().uses(1).build()))
                         .build());
             }
+        }
+
+        if (buttons.isEmpty()) {
+            p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.no_boosters_to_share", "&cYou do not have any active boosters available to share.")));
+            return;
         }
 
         Dialog dialog = Dialog.create(builder -> builder.empty()

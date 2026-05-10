@@ -158,6 +158,10 @@ booster_list:
     prof_summary: "&6Profession <profession>: &e<multiplier>x &7(+<percent>%)"
     prof_none: "&7No profession boosters."
 
+    empty_button:
+      name: "&cNo Boosters"
+      tooltip: "&7Nothing to show here."
+
     share_button:
       name: "&e&lShare Booster"
       tooltip: "&7Click to share a booster with others."

@@ -71,14 +71,14 @@ public class ManageShareGUI implements Listener {
         Booster booster = getBooster(p, boosterId);
         if (booster == null) return;
 
-        String title = getGui().getString("manage_share.dialog.title", "Manage Shares");
-        List<ActionButton> buttons = new ArrayList<>();
-        ConfigurationSection headSec = getGui().getConfig().getConfigurationSection("manage_share.dialog.player_button");
-
         if (booster.getSharedPlayers().isEmpty()) {
             p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("manage_share.dialog.empty_notify", "&cNot sharing with anyone.")));
             return;
         }
+
+        String title = getGui().getString("manage_share.dialog.title", "Manage Shares");
+        List<ActionButton> buttons = new ArrayList<>();
+        ConfigurationSection headSec = getGui().getConfig().getConfigurationSection("manage_share.dialog.player_button");
 
         for (UUID targetUUID : booster.getSharedPlayers()) {
             OfflinePlayer target = Bukkit.getOfflinePlayer(targetUUID);
