@@ -4,10 +4,11 @@ import net.danh.sincebooster.SinceBooster;
 import net.danh.sincebooster.manager.Booster;
 import net.danh.sincebooster.utils.ColorUtils;
 import net.danh.sincebooster.utils.ConfigUtils;
-import net.kyori.adventure.text.Component;
+import net.danh.sincebooster.utils.ItemBuilder;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -21,13 +22,12 @@ import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 /**
  * Multi-stage GUI for selecting a player and a booster to share.
- * Loads purely from gui.yml.
+ * Strictly uses ItemBuilder combined with gui.yml definitions for completely dynamic rendering.
  */
 public class ShareGUI implements Listener {
 
@@ -60,28 +60,30 @@ public class ShareGUI implements Listener {
 
         List<Integer> slots = getGui().getConfig().getIntegerList("share_gui.player_selector.layout.player_slots");
         int slotIdx = 0;
+        ConfigurationSection headSec = getGui().getConfig().getConfigurationSection("share_gui.player_selector.items.player_head");
 
         for (Player target : Bukkit.getOnlinePlayers()) {
             if (target.getUniqueId().equals(p.getUniqueId())) continue;
             if (slotIdx >= slots.size()) break;
 
-            ItemStack head = new ItemStack(Material.PLAYER_HEAD);
+            ItemStack head = new ItemBuilder(plugin, Material.PLAYER_HEAD).applyConfig(headSec, "&e<player_name>",
+                    "<player_name>", target.getName()
+            ).build();
+
             SkullMeta meta = (SkullMeta) head.getItemMeta();
-            meta.setOwningPlayer(target);
-
-            String nameFormat = getGui().getString("share_gui.player_selector.items.player_head.name", "<yellow><player_name>");
-            meta.displayName(ColorUtils.parse(nameFormat.replace("<player_name>", target.getName())));
-
-            List<Component> lore = new ArrayList<>();
-            for (String s : getGui().getConfig().getStringList("share_gui.player_selector.items.player_head.lore")) {
-                lore.add(ColorUtils.parse(s));
+            if (meta != null) {
+                meta.setOwningPlayer(target);
+                head.setItemMeta(meta);
             }
-            meta.lore(lore);
-            head.setItemMeta(meta);
 
             inv.setItem(slots.get(slotIdx++), head);
         }
-        inv.setItem(getGui().getInt("share_gui.player_selector.items.back_button.slot"), createBackButton());
+
+        ConfigurationSection backSec = getGui().getConfig().getConfigurationSection("share_gui.player_selector.items.back_button");
+        if (backSec != null) {
+            Material mat = Material.matchMaterial(backSec.getString("material", "ARROW"));
+            inv.setItem(getGui().getInt("share_gui.player_selector.items.back_button.slot"), new ItemBuilder(plugin, mat).applyConfig(backSec, "&cBack").build());
+        }
         p.openInventory(inv);
     }
 
@@ -109,29 +111,31 @@ public class ShareGUI implements Listener {
                 inv.setItem(slots.get(slotIdx++), createDetailedShareItem(b, p, maxShare));
             }
         }
-        inv.setItem(getGui().getInt("share_gui.booster_selector.items.back_button.slot"), createBackButton());
+
+        ConfigurationSection backSec = getGui().getConfig().getConfigurationSection("share_gui.booster_selector.items.back_button");
+        if (backSec != null) {
+            Material mat = Material.matchMaterial(backSec.getString("material", "ARROW"));
+            inv.setItem(getGui().getInt("share_gui.booster_selector.items.back_button.slot"), new ItemBuilder(plugin, mat).applyConfig(backSec, "&cBack").build());
+        }
         p.openInventory(inv);
     }
 
     private ItemStack createDetailedShareItem(Booster b, Player p, int maxShare) {
         Material mat = (b.getProfession() == null) ? Material.NETHER_STAR : Material.ENCHANTED_BOOK;
-        ItemStack item = new ItemStack(mat);
-        ItemMeta meta = item.getItemMeta();
+        ConfigurationSection baseSec = getGui().getConfig().getConfigurationSection("share_gui.booster_selector.items.booster");
 
-        meta.getPersistentDataContainer().set(boosterIdKey, PersistentDataType.STRING, b.getId());
+        if (baseSec != null && baseSec.contains("material")) {
+            Material overridden = Material.matchMaterial(baseSec.getString("material"));
+            if (overridden != null) mat = overridden;
+        }
+
+        ItemBuilder builder = new ItemBuilder(plugin, mat);
+        builder.setTag(boosterIdKey, PersistentDataType.STRING, b.getId());
 
         String keyDur = b.isPermanent() ? "name_perm" : "name_time";
-        String basePath = "share_gui.booster_selector.items.booster.";
-
         long left = (b.getEndTime() - System.currentTimeMillis()) / 1000;
         String timeStr = formatTime(Math.max(0, left));
         String id = b.getId().toUpperCase();
-
-        String name = getGui().getString(basePath + keyDur);
-        if (name != null) meta.displayName(ColorUtils.parse(name.replace("<id>", id).replace("<time>", timeStr)));
-
-        List<String> loreRaw = getGui().getConfig().getStringList(basePath + "lore");
-        List<Component> lore = new ArrayList<>();
 
         String typeColor = (b.getProfession() == null) ? "<aqua>" : "<green>";
         String typeName = (b.getProfession() == null) ? "Class XP" : "Job: " + b.getProfession().toUpperCase();
@@ -144,28 +148,27 @@ public class ShareGUI implements Listener {
         int currentShare = b.getSharedPlayers().size();
         boolean isFull = currentShare >= maxShare;
         String slotColor = isFull ? "<red>" : "<green>";
-        String statusText = getGui().getString(isFull ? basePath + "status_full" : basePath + "status_available");
-        statusText = statusText.replace("<current>", String.valueOf(currentShare)).replace("<max>", String.valueOf(maxShare));
+        String statusText = "";
 
-        for (String line : loreRaw) {
-            line = line.replace("<type_color>", typeColor)
-                    .replace("<type_name>", typeName)
-                    .replace("<multiplier>", String.valueOf(baseMult))
-                    .replace("<percent>", String.valueOf((int) ((baseMult - 1.0) * 100)))
-                    .replace("<rec_multiplier>", String.format("%.2f", recMult))
-                    .replace("<rec_percent>", String.valueOf((int) ((recMult - 1.0) * 100)))
-                    .replace("<slot_color>", slotColor)
-                    .replace("<status_text>", statusText);
+        if (baseSec != null) {
+            statusText = baseSec.getString(isFull ? "status_full" : "status_available", "");
+            statusText = statusText.replace("<current>", String.valueOf(currentShare)).replace("<max>", String.valueOf(maxShare));
 
-            if (line.contains("\n")) {
-                for (String part : line.split("\n")) lore.add(ColorUtils.parse(part));
-            } else {
-                lore.add(ColorUtils.parse(line));
-            }
+            builder.applyConfig(baseSec, baseSec.getString(keyDur, "&6<id>"),
+                    "<id>", id,
+                    "<time>", timeStr,
+                    "<type_color>", typeColor,
+                    "<type_name>", typeName,
+                    "<multiplier>", String.valueOf(baseMult),
+                    "<percent>", String.valueOf((int) ((baseMult - 1.0) * 100)),
+                    "<rec_multiplier>", String.format("%.2f", recMult),
+                    "<rec_percent>", String.valueOf((int) ((recMult - 1.0) * 100)),
+                    "<slot_color>", slotColor,
+                    "<status_text>", statusText
+            );
         }
-        meta.lore(lore);
-        item.setItemMeta(meta);
-        return item;
+
+        return builder.build();
     }
 
     private String getBoosterIdFromItem(ItemStack item) {
@@ -185,14 +188,14 @@ public class ShareGUI implements Listener {
             if (item == null || item.getType() == Material.AIR) return;
             if (e.getClickedInventory() != e.getView().getTopInventory()) return;
 
-            if (isBackButton(item)) {
+            if (isBackButton(item, "share_gui.player_selector.items.back_button.material")) {
                 plugin.getBoosterGUI().open(p);
                 return;
             }
 
             if (item.getType() == Material.PLAYER_HEAD) {
                 SkullMeta meta = (SkullMeta) item.getItemMeta();
-                if (meta.getOwningPlayer() != null && meta.getOwningPlayer().isOnline()) {
+                if (meta != null && meta.getOwningPlayer() != null && meta.getOwningPlayer().isOnline()) {
                     openBoosterSelector(p, meta.getOwningPlayer().getPlayer());
                 } else {
                     p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.invalid_target", "&cPlayer is no longer online!")));
@@ -205,7 +208,7 @@ public class ShareGUI implements Listener {
             if (item == null || item.getType() == Material.AIR) return;
             if (e.getClickedInventory() != e.getView().getTopInventory()) return;
 
-            if (isBackButton(item)) {
+            if (isBackButton(item, "share_gui.booster_selector.items.back_button.material")) {
                 openPlayerSelector(p);
                 return;
             }
@@ -229,17 +232,8 @@ public class ShareGUI implements Listener {
         if (holder instanceof PlayerSelectorHolder || holder instanceof BoosterSelectorHolder) e.setCancelled(true);
     }
 
-    private ItemStack createBackButton() {
-        String mat = getGui().getString("share_gui.items.back_button.material", "ARROW");
-        ItemStack item = new ItemStack(Material.valueOf(mat));
-        ItemMeta meta = item.getItemMeta();
-        meta.displayName(ColorUtils.parse(getGui().getString("share_gui.items.back_button.name", "&cBack")));
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    private boolean isBackButton(ItemStack item) {
-        String matName = getGui().getString("share_gui.items.back_button.material", "ARROW");
+    private boolean isBackButton(ItemStack item, String path) {
+        String matName = getGui().getString(path, "ARROW");
         return item.getType().name().equals(matName);
     }
 

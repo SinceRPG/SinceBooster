@@ -4,11 +4,12 @@ import net.danh.sincebooster.SinceBooster;
 import net.danh.sincebooster.manager.Booster;
 import net.danh.sincebooster.utils.ColorUtils;
 import net.danh.sincebooster.utils.ConfigUtils;
-import net.kyori.adventure.text.Component;
+import net.danh.sincebooster.utils.ItemBuilder;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -22,13 +23,12 @@ import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 /**
  * GUI for managing players that a specific booster is shared with.
- * Layout completely derived from gui.yml.
+ * Incorporates ItemBuilder logic directly tied to the gui.yml mappings.
  */
 public class ManageShareGUI implements Listener {
     private final SinceBooster plugin;
@@ -74,7 +74,9 @@ public class ManageShareGUI implements Listener {
         int slotIdx = 0;
 
         if (booster.getSharedPlayers().isEmpty()) {
-            inv.setItem(getGui().getInt("manage_share.items.empty_slot.slot", 13), createEmptyItem());
+            ConfigurationSection emptySec = getGui().getConfig().getConfigurationSection("manage_share.items.empty_slot");
+            Material emptyMat = emptySec != null ? Material.matchMaterial(emptySec.getString("material", "BARRIER")) : Material.BARRIER;
+            inv.setItem(getGui().getInt("manage_share.items.empty_slot.slot", 13), new ItemBuilder(plugin, emptyMat).applyConfig(emptySec, "&cNot Sharing").build());
         } else {
             for (UUID targetUUID : booster.getSharedPlayers()) {
                 if (slotIdx >= playerSlots.size()) break;
@@ -87,34 +89,16 @@ public class ManageShareGUI implements Listener {
     }
 
     private ItemStack createPlayerHead(OfflinePlayer target) {
-        ItemStack item = new ItemStack(Material.PLAYER_HEAD);
+        ConfigurationSection headSec = getGui().getConfig().getConfigurationSection("manage_share.items.player_head");
+        ItemStack item = new ItemBuilder(plugin, Material.PLAYER_HEAD).applyConfig(headSec, "&cKick: <player>",
+                "<player>", target.getName() != null ? target.getName() : "Unknown"
+        ).setTag(targetKey, PersistentDataType.STRING, target.getUniqueId().toString()).build();
+
         SkullMeta meta = (SkullMeta) item.getItemMeta();
-        meta.setOwningPlayer(target);
-
-        String name = getGui().getString("manage_share.items.player_head.name").replace("<player>", target.getName() != null ? target.getName() : "Unknown");
-        meta.displayName(ColorUtils.parse(name));
-
-        List<Component> lore = new ArrayList<>();
-        for (String s : getGui().getConfig().getStringList("manage_share.items.player_head.lore")) {
-            lore.add(ColorUtils.parse(s));
+        if (meta != null) {
+            meta.setOwningPlayer(target);
+            item.setItemMeta(meta);
         }
-        meta.lore(lore);
-
-        meta.getPersistentDataContainer().set(targetKey, PersistentDataType.STRING, target.getUniqueId().toString());
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    private ItemStack createEmptyItem() {
-        String matName = getGui().getString("manage_share.items.empty_slot.material", "BARRIER");
-        ItemStack item = new ItemStack(Material.valueOf(matName));
-        ItemMeta meta = item.getItemMeta();
-        meta.displayName(ColorUtils.parse(getGui().getString("manage_share.items.empty_slot.name", "&cNo Shares Active")));
-        List<Component> lore = new ArrayList<>();
-        for (String s : getGui().getConfig().getStringList("manage_share.items.empty_slot.lore"))
-            lore.add(ColorUtils.parse(s));
-        meta.lore(lore);
-        item.setItemMeta(meta);
         return item;
     }
 
@@ -136,7 +120,7 @@ public class ManageShareGUI implements Listener {
                 return;
             }
             ItemMeta meta = item.getItemMeta();
-            if (meta.getPersistentDataContainer().has(targetKey, PersistentDataType.STRING)) {
+            if (meta != null && meta.getPersistentDataContainer().has(targetKey, PersistentDataType.STRING)) {
                 String uuidStr = meta.getPersistentDataContainer().get(targetKey, PersistentDataType.STRING);
                 if (uuidStr != null) {
                     OfflinePlayer target = Bukkit.getOfflinePlayer(UUID.fromString(uuidStr));
