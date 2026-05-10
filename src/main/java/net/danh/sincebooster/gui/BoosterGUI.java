@@ -25,6 +25,10 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 
+/**
+ * Main GUI class for viewing owned and received boosters.
+ * Reads layout entirely from gui.yml.
+ */
 public class BoosterGUI implements Listener {
 
     private final SinceBooster plugin;
@@ -37,6 +41,10 @@ public class BoosterGUI implements Listener {
         this.boosterIdKey = new NamespacedKey(plugin, "gui_booster_id");
         this.ownerUuidKey = new NamespacedKey(plugin, "gui_owner_uuid");
         this.cooldownKey = new NamespacedKey(plugin, "gui_cooldown");
+    }
+
+    private ConfigUtils getGui() {
+        return plugin.getGuiFile();
     }
 
     private ConfigUtils getMsg() {
@@ -64,13 +72,14 @@ public class BoosterGUI implements Listener {
     public void open(Player viewer, Player target) {
         String titleStr;
         if (viewer.getUniqueId().equals(target.getUniqueId())) {
-            titleStr = getMsg().getString("booster.gui.title", "Boosters List");
+            titleStr = getGui().getString("booster_list.title", "Boosters List");
         } else {
-            titleStr = getMsg().getString("admin.view_title", "Boosters: <target>").replace("<target>", target.getName());
+            titleStr = getGui().getString("booster_list.other_title", "Boosters: <target>").replace("<target>", target.getName());
         }
 
+        int size = getGui().getInt("booster_list.size", 54);
         BoosterHolder holder = new BoosterHolder(target.getUniqueId());
-        Inventory inv = Bukkit.createInventory(holder, 54, ColorUtils.parse(titleStr));
+        Inventory inv = Bukkit.createInventory(holder, size, ColorUtils.parse(titleStr));
         holder.setInventory(inv);
 
         updateContent(inv, target.getUniqueId(), viewer);
@@ -97,13 +106,7 @@ public class BoosterGUI implements Listener {
                 for (Booster b : otherList) {
                     if (b.isValid() && b.getSharedPlayers().contains(targetUUID)) {
                         Player onlineOwner = Bukkit.getPlayer(ownerUUID);
-                        String ownerName;
-                        if (onlineOwner != null) {
-                            ownerName = onlineOwner.getName();
-                        } else {
-                            OfflinePlayer offP = Bukkit.getOfflinePlayer(ownerUUID);
-                            ownerName = (offP.getName() != null) ? offP.getName() : ownerUUID.toString().substring(0, 8);
-                        }
+                        String ownerName = (onlineOwner != null) ? onlineOwner.getName() : getOfflineName(ownerUUID);
                         displayList.add(new DisplayBooster(b, false, ownerName, ownerUUID));
                     }
                 }
@@ -117,8 +120,7 @@ public class BoosterGUI implements Listener {
                 if (Bukkit.getPlayer(ownerUUID) != null) continue;
 
                 List<Booster> boosters = entry.getValue();
-                OfflinePlayer offlineOwner = Bukkit.getOfflinePlayer(ownerUUID);
-                String ownerName = offlineOwner.getName() != null ? offlineOwner.getName() : "Unknown (Off)";
+                String ownerName = getOfflineName(ownerUUID) + " (Off)";
 
                 for (Booster b : boosters) {
                     if (b.isValid() && b.getSharedPlayers().contains(targetUUID)) {
@@ -145,39 +147,43 @@ public class BoosterGUI implements Listener {
         };
         classBoosters.sort(sorter);
         profBoosters.sort(sorter);
-        fillSection(inv, classBoosters, 0, 18, targetUUID);
 
-        ItemStack glass = createSeparator();
-        for (int i = 18; i < 27; i++) {
-            if (i == 21) inv.setItem(i, createClassSummary(displayList));
-            else if (i == 23) inv.setItem(i, createProfSummary(displayList));
-            else {
-                ItemStack current = inv.getItem(i);
-                if (current == null || !current.isSimilar(glass)) {
-                    inv.setItem(i, glass);
-                }
-            }
+        List<Integer> classSlots = getGui().getConfig().getIntegerList("booster_list.layout.class_boosters");
+        List<Integer> profSlots = getGui().getConfig().getIntegerList("booster_list.layout.prof_boosters");
+        fillSection(inv, classBoosters, classSlots, viewer.getUniqueId());
+        fillSection(inv, profBoosters, profSlots, viewer.getUniqueId());
+
+        // Fill separators
+        ItemStack glass = createItemFromConfig("booster_list.items.separator");
+        for (int slot : getGui().getConfig().getIntegerList("booster_list.layout.separators")) {
+            inv.setItem(slot, glass);
         }
-        fillSection(inv, profBoosters, 27, 54, targetUUID);
 
-        int shareSlot = getMsg().getInt("booster.gui.share_button.slot", 49);
-        inv.setItem(shareSlot, createShareButton());
+        // Set static summary & buttons
+        inv.setItem(getGui().getInt("booster_list.items.class_summary.slot"), createClassSummary(displayList));
+        inv.setItem(getGui().getInt("booster_list.items.prof_summary.slot"), createProfSummary(displayList));
+        inv.setItem(getGui().getInt("booster_list.items.share_button.slot"), createItemFromConfig("booster_list.items.share_button"));
+
         if (viewer.getUniqueId().equals(targetUUID)) {
-            int toggleSlot = getMsg().getInt("booster.gui.offline_toggle_button.slot", 50);
-            inv.setItem(toggleSlot, createOfflineToggleItem(viewer));
+            inv.setItem(getGui().getInt("booster_list.items.offline_toggle_button.slot"), createOfflineToggleItem(viewer));
         }
     }
 
-    private void fillSection(Inventory inv, List<DisplayBooster> list, int start, int end, UUID viewerUUID) {
-        int limit = end - start;
+    private String getOfflineName(UUID uuid) {
+        OfflinePlayer p = Bukkit.getOfflinePlayer(uuid);
+        return p.getName() != null ? p.getName() : uuid.toString().substring(0, 8);
+    }
+
+    private void fillSection(Inventory inv, List<DisplayBooster> list, List<Integer> slots, UUID viewerUUID) {
+        int limit = slots.size();
         for (int i = 0; i < limit; i++) {
-            int slot = start + i;
+            int slot = slots.get(i);
             ItemStack newItem;
 
             if (i < list.size()) {
                 newItem = createBoosterItem(list.get(i), viewerUUID);
             } else {
-                if (list.isEmpty() && i == (limit / 2)) newItem = createEmptyItem();
+                if (list.isEmpty() && i == (limit / 2)) newItem = createItemFromConfig("booster_list.items.empty_slot");
                 else newItem = null;
             }
 
@@ -211,22 +217,22 @@ public class BoosterGUI implements Listener {
 
         String keyType = db.isOwner ? "own" : "received";
         String keyDur = b.isPermanent() ? "perm" : "time";
-        String basePath = "booster.gui.item." + keyType + ".";
+        String basePath = "booster_list.items." + keyType + ".";
 
         long left = (b.getEndTime() - System.currentTimeMillis()) / 1000;
         String timeStr = formatTime(Math.max(0, left));
         String id = b.getId().toUpperCase();
 
-        String name = getMsg().getString(basePath + "name_" + keyDur);
+        String name = getGui().getString(basePath + "name_" + keyDur);
         if (name != null) meta.displayName(ColorUtils.parse(name.replace("<id>", id).replace("<time>", timeStr)));
 
-        List<String> loreRaw = getMsg().getConfig().getStringList(basePath + "lore");
+        List<String> loreRaw = getGui().getConfig().getStringList(basePath + "lore");
         List<Component> lore = new ArrayList<>();
 
         String typeColor = (b.getProfession() == null) ? "<aqua>" : "<green>";
         String typeName = (b.getProfession() == null) ? "Class XP" : "Job: " + b.getProfession().toUpperCase();
-        String statusPath = b.isPermanent() ? "booster.gui.item.status_perm" : "booster.gui.item.status_time";
-        String status = getMsg().getString(statusPath).replace("<time_left>", timeStr);
+        String statusPath = b.isPermanent() ? "booster_list.items.status_perm" : "booster_list.items.status_time";
+        String status = getGui().getString(statusPath).replace("<time_left>", timeStr);
 
         for (String line : loreRaw) {
             line = line.replace("<type_color>", typeColor).replace("<type_name>", typeName).replace("<status>", status);
@@ -246,26 +252,34 @@ public class BoosterGUI implements Listener {
 
                 String sharedListStr;
                 if (b.getSharedPlayers().isEmpty()) {
-                    sharedListStr = getMsg().getString("booster.gui.item.shared_list_none", "&7- (No active shares)");
+                    sharedListStr = getGui().getString("booster_list.items.shared_list_none", "&7- (No active shares)");
                 } else {
                     StringBuilder sb = new StringBuilder();
                     for (UUID uid : b.getSharedPlayers()) {
                         OfflinePlayer op = Bukkit.getOfflinePlayer(uid);
                         String pName = (op.getName() != null) ? op.getName() : "Unknown";
-                        String format = getMsg().getString("booster.gui.item.shared_list_format", "&7- &f<player>");
+                        String format = getGui().getString("booster_list.items.shared_list_format", "&7- &f<player>");
                         sb.append(format.replace("<player>", pName)).append("\n");
                     }
                     sharedListStr = sb.toString().trim();
                 }
 
-                line = line.replace("<multiplier>", String.valueOf(b.getMultiplier())).replace("<percent>", String.valueOf((int) ((b.getMultiplier() - 1) * 100))).replace("<decay_rate>", String.format("%.1f", decayRate)).replace("<efficiency>", String.format("%.0f", efficiency)).replace("<shared_count>", String.valueOf(b.getSharedPlayers().size())).replace("<shared_list>", sharedListStr);
+                line = line.replace("<multiplier>", String.valueOf(b.getMultiplier()))
+                        .replace("<percent>", String.valueOf((int) ((b.getMultiplier() - 1) * 100)))
+                        .replace("<decay_rate>", String.format("%.1f", decayRate))
+                        .replace("<efficiency>", String.format("%.0f", efficiency))
+                        .replace("<shared_count>", String.valueOf(b.getSharedPlayers().size()))
+                        .replace("<shared_list>", sharedListStr);
             } else {
                 double baseMult = b.getMultiplier();
                 double currentRate = plugin.getBoosterManager().getShareManager().getReceiverMultiplier(b, viewerUUID);
                 double efficiency = currentRate * 100.0;
                 double realMult = 1.0 + ((baseMult - 1.0) * currentRate);
 
-                line = line.replace("<owner_name>", db.ownerName).replace("<base_multiplier>", String.valueOf(baseMult)).replace("<efficiency>", String.format("%.0f", efficiency)).replace("<real_multiplier>", String.format("%.2f", realMult));
+                line = line.replace("<owner_name>", db.ownerName)
+                        .replace("<base_multiplier>", String.valueOf(baseMult))
+                        .replace("<efficiency>", String.format("%.0f", efficiency))
+                        .replace("<real_multiplier>", String.format("%.2f", realMult));
             }
 
             if (line.contains("\n")) {
@@ -279,36 +293,38 @@ public class BoosterGUI implements Listener {
         return item;
     }
 
-    private ItemStack createShareButton() {
-        String matName = getMsg().getString("booster.gui.share_button.material", "OAK_SIGN");
+    private ItemStack createItemFromConfig(String path) {
+        String matName = getGui().getString(path + ".material", "STONE");
         ItemStack item = new ItemStack(Material.valueOf(matName));
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(ColorUtils.parse(getMsg().getString("booster.gui.share_button.name")));
+        if (getGui().getString(path + ".name") != null) {
+            meta.displayName(ColorUtils.parse(getGui().getString(path + ".name")));
+        }
         List<Component> lore = new ArrayList<>();
-        for (String s : getMsg().getConfig().getStringList("booster.gui.share_button.lore"))
-            lore.add(ColorUtils.parse(s));
+        for (String s : getGui().getConfig().getStringList(path + ".lore")) lore.add(ColorUtils.parse(s));
         meta.lore(lore);
         item.setItemMeta(meta);
         return item;
     }
 
     private ItemStack createClassSummary(List<DisplayBooster> list) {
-        String matName = getMsg().getString("booster.gui.summary_class.material", "BEACON");
-        ItemStack item = new ItemStack(Material.valueOf(matName));
+        ItemStack item = createItemFromConfig("booster_list.items.class_summary");
         ItemMeta meta = item.getItemMeta();
         double totalAdd = 0, ownAdd = 0, sharedAdd = 0;
         for (DisplayBooster db : list) {
             if (db.booster.getProfession() == null) {
-                double bonus = displayBooster(db);
+                double bonus = displayBoosterBonus(db);
                 totalAdd += bonus;
                 if (db.isOwner) ownAdd += bonus;
                 else sharedAdd += bonus;
             }
         }
-        meta.displayName(ColorUtils.parse(getMsg().getString("booster.gui.summary_class.name")));
         List<Component> lore = new ArrayList<>();
-        for (String line : getMsg().getConfig().getStringList("booster.gui.summary_class.lore")) {
-            line = line.replace("<total_multiplier>", String.format("%.2f", 1.0 + totalAdd)).replace("<total_percent>", String.valueOf((int) (totalAdd * 100))).replace("<booster_add>", String.valueOf((int) (totalAdd * 100))).replace("<own_percent>", String.valueOf((int) (ownAdd * 100))).replace("<shared_percent>", String.valueOf((int) (sharedAdd * 100)));
+        for (String line : getGui().getConfig().getStringList("booster_list.items.class_summary.lore")) {
+            line = line.replace("<total_multiplier>", String.format("%.2f", 1.0 + totalAdd))
+                    .replace("<total_percent>", String.valueOf((int) (totalAdd * 100)))
+                    .replace("<own_percent>", String.valueOf((int) (ownAdd * 100)))
+                    .replace("<shared_percent>", String.valueOf((int) (sharedAdd * 100)));
             lore.add(ColorUtils.parse(line));
         }
         meta.lore(lore);
@@ -317,29 +333,28 @@ public class BoosterGUI implements Listener {
     }
 
     private ItemStack createProfSummary(List<DisplayBooster> list) {
-        String matName = getMsg().getString("booster.gui.summary_prof.material", "KNOWLEDGE_BOOK");
-        ItemStack item = new ItemStack(Material.valueOf(matName));
+        ItemStack item = createItemFromConfig("booster_list.items.prof_summary");
         ItemMeta meta = item.getItemMeta();
         Map<String, Double> totals = new HashMap<>();
         for (DisplayBooster db : list) {
             String p = db.booster.getProfession();
             if (p != null) {
-                double bonus = displayBooster(db);
+                double bonus = displayBoosterBonus(db);
                 totals.put(p, totals.getOrDefault(p, 0.0) + bonus);
             }
         }
-        meta.displayName(ColorUtils.parse(getMsg().getString("booster.gui.summary_prof.name")));
+        String format = getGui().getString("booster_list.items.prof_summary.prof_format");
+        String none = getGui().getString("booster_list.items.prof_summary.prof_none");
         List<Component> lore = new ArrayList<>();
-        String format = getMsg().getString("booster.gui.summary_prof.prof_format");
-        String none = getMsg().getString("booster.gui.summary_prof.prof_none");
-        for (String line : getMsg().getConfig().getStringList("booster.gui.summary_prof.lore")) {
+        for (String line : getGui().getConfig().getStringList("booster_list.items.prof_summary.lore")) {
             if (line.contains("<prof_list>")) {
-                if (totals.isEmpty()) {
-                    lore.add(ColorUtils.parse(none));
-                } else {
+                if (totals.isEmpty()) lore.add(ColorUtils.parse(none));
+                else {
                     for (Map.Entry<String, Double> entry : totals.entrySet()) {
                         double val = 1.0 + entry.getValue();
-                        String f = format.replace("<profession>", entry.getKey().toUpperCase()).replace("<multiplier>", String.format("%.2f", val)).replace("<percent>", String.valueOf((int) (entry.getValue() * 100)));
+                        String f = format.replace("<profession>", entry.getKey().toUpperCase())
+                                .replace("<multiplier>", String.format("%.2f", val))
+                                .replace("<percent>", String.valueOf((int) (entry.getValue() * 100)));
                         lore.add(ColorUtils.parse(f));
                     }
                 }
@@ -352,7 +367,7 @@ public class BoosterGUI implements Listener {
         return item;
     }
 
-    private double displayBooster(DisplayBooster db) {
+    private double displayBoosterBonus(DisplayBooster db) {
         double bonus = db.booster.getMultiplier() - 1.0;
         if (db.booster.isPermanent() && !db.booster.getSharedPlayers().isEmpty()) {
             double rate = db.isOwner ? plugin.getBoosterManager().getShareManager().getOwnerBuffRate(db.ownerUUID) : plugin.getBoosterManager().getShareManager().getReceiverBuffRate(db.ownerUUID);
@@ -361,33 +376,12 @@ public class BoosterGUI implements Listener {
         return bonus;
     }
 
-    private ItemStack createSeparator() {
-        String matName = getMsg().getString("booster.gui.separator.material", "BLACK_STAINED_GLASS_PANE");
-        ItemStack item = new ItemStack(Material.valueOf(matName));
-        ItemMeta meta = item.getItemMeta();
-        meta.displayName(Component.empty());
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    private ItemStack createEmptyItem() {
-        ItemStack item = new ItemStack(Material.BARRIER);
-        ItemMeta meta = item.getItemMeta();
-        meta.displayName(ColorUtils.parse(getMsg().getString("booster.gui.empty_slot.name")));
-        List<Component> lore = new ArrayList<>();
-        for (String s : getMsg().getConfig().getStringList("booster.gui.empty_slot.lore"))
-            lore.add(ColorUtils.parse(s));
-        meta.lore(lore);
-        item.setItemMeta(meta);
-        return item;
-    }
-
     private String formatTime(long seconds) {
         long days = seconds / 86400;
         long hours = (seconds % 86400) / 3600;
         long minutes = (seconds % 3600) / 60;
         long secs = seconds % 60;
-        String format = getMsg().getString("booster.gui.formats.time_left");
+        String format = getGui().getString("booster_list.formats.time_left");
         return format.replace("<day>", String.valueOf(days)).replace("<hour>", String.valueOf(hours)).replace("<min>", String.valueOf(minutes)).replace("<sec>", String.valueOf(secs));
     }
 
@@ -399,35 +393,8 @@ public class BoosterGUI implements Listener {
             PlayerDataHandler.PlayerSession s = plugin.getPlayerDataHandler().getSession(p.getUniqueId());
             if (s != null) isEnabled = s.isOfflineShareEnabled();
         }
-
-        String stateKey;
-        if (!hasPerm) stateKey = "no_perm";
-        else stateKey = isEnabled ? "enabled" : "disabled";
-
-        String basePath = "booster.gui.offline_toggle_button." + stateKey;
-
-        String matName = getMsg().getString(basePath + ".material", "BARRIER");
-        Material mat;
-        try {
-            mat = Material.valueOf(matName);
-        } catch (Exception e) {
-            mat = Material.BARRIER;
-        }
-
-        ItemStack item = new ItemStack(mat);
-        ItemMeta meta = item.getItemMeta();
-
-        String name = getMsg().getString(basePath + ".name", "&cOffline Share");
-        meta.displayName(ColorUtils.parse(name));
-
-        List<Component> lore = new ArrayList<>();
-        for (String s : getMsg().getConfig().getStringList(basePath + ".lore")) {
-            lore.add(ColorUtils.parse(s));
-        }
-        meta.lore(lore);
-
-        item.setItemMeta(meta);
-        return item;
+        String stateKey = !hasPerm ? "no_perm" : (isEnabled ? "enabled" : "disabled");
+        return createItemFromConfig("booster_list.items.offline_toggle_button." + stateKey);
     }
 
     @EventHandler
@@ -439,10 +406,9 @@ public class BoosterGUI implements Listener {
 
         if (e.getClickedInventory() == null || e.getClickedInventory() == e.getView().getTopInventory()) {
             int slot = e.getSlot();
-            int shareSlot = getMsg().getInt("booster.gui.share_button.slot", 49);
-            int toggleSlot = getMsg().getInt("booster.gui.offline_toggle_button.slot", 50);
+            int shareSlot = getGui().getInt("booster_list.items.share_button.slot");
+            int toggleSlot = getGui().getInt("booster_list.items.offline_toggle_button.slot");
             Player p = (Player) e.getWhoClicked();
-
             boolean isSelfView = targetUUID.equals(p.getUniqueId());
 
             if (slot == shareSlot) {
@@ -466,7 +432,7 @@ public class BoosterGUI implements Listener {
                 if (p.getPersistentDataContainer().has(cooldownKey, PersistentDataType.LONG)) {
                     Long lastClick = p.getPersistentDataContainer().get(cooldownKey, PersistentDataType.LONG);
                     if (lastClick != null && System.currentTimeMillis() - lastClick < 2000) {
-                        p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("booster.gui.action_cooldown", "&cPlease slow down!")));
+                        p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("booster.gui_action_cooldown", "&cPlease slow down!")));
                         return;
                     }
                 }
@@ -476,13 +442,9 @@ public class BoosterGUI implements Listener {
                 if (session != null) {
                     boolean current = session.isOfflineShareEnabled();
                     session.setOfflineShareEnabled(!current);
-
                     plugin.getPlayerDataHandler().saveData(p.getUniqueId(), false);
 
-                    if (!current)
-                        p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.offline_toggle_on")));
-                    else p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.offline_toggle_off")));
-
+                    p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString(current ? "share.offline_toggle_off" : "share.offline_toggle_on")));
                     updateContent(e.getInventory(), targetUUID, p);
                 }
                 return;
@@ -494,10 +456,7 @@ public class BoosterGUI implements Listener {
                 if (meta.getPersistentDataContainer().has(boosterIdKey, PersistentDataType.STRING)) {
                     String bId = meta.getPersistentDataContainer().get(boosterIdKey, PersistentDataType.STRING);
                     String ownerUuidStr = meta.getPersistentDataContainer().get(ownerUuidKey, PersistentDataType.STRING);
-                    UUID boosterOwnerUUID = null;
-                    if (ownerUuidStr != null) {
-                        boosterOwnerUUID = UUID.fromString(ownerUuidStr);
-                    }
+                    UUID boosterOwnerUUID = (ownerUuidStr != null) ? UUID.fromString(ownerUuidStr) : null;
 
                     if (Objects.equals(boosterOwnerUUID, p.getUniqueId())) {
                         if (isSelfView) {
@@ -510,13 +469,8 @@ public class BoosterGUI implements Listener {
                         }
                     } else {
                         if (e.getClick().isShiftClick() && isSelfView) {
-                            OfflinePlayer owner = null;
-                            if (boosterOwnerUUID != null) {
-                                owner = Bukkit.getOfflinePlayer(boosterOwnerUUID);
-                            }
-                            if (owner != null) {
-                                plugin.getBoosterManager().getShareManager().leaveShare(p, owner);
-                            }
+                            OfflinePlayer owner = (boosterOwnerUUID != null) ? Bukkit.getOfflinePlayer(boosterOwnerUUID) : null;
+                            if (owner != null) plugin.getBoosterManager().getShareManager().leaveShare(p, owner);
                             p.closeInventory();
                         }
                     }

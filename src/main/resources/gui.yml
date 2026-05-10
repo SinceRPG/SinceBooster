@@ -1,0 +1,186 @@
+# =====================================================
+#             FULL GUI LAYOUT CONFIGURATION
+# =====================================================
+
+booster_list:
+  title: "&0Boosters List"
+  other_title: "&8Boosters: &2<target>"
+  size: 54
+
+  formats:
+    time_left: "&f<day>d <hour>h <min>m <sec>s"
+
+  layout:
+    class_boosters: [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 ]
+    prof_boosters: [ 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44 ]
+    separators: [ 18, 19, 20, 22, 24, 25, 26, 45, 46, 47, 48, 51, 52, 53 ]
+
+  items:
+    separator:
+      material: "BLACK_STAINED_GLASS_PANE"
+      name: "&r"
+      lore: [ ]
+
+    empty_slot:
+      material: "BARRIER"
+      name: "&cEmpty Slot"
+      lore:
+        - "&7Acquire more boosters to fill this up!"
+
+    class_summary:
+      slot: 21
+      material: "BEACON"
+      name: "&aClass XP Summary"
+      lore:
+        - "&7Total Multiplier: &e<total_multiplier>x &7(+<total_percent>%)"
+        - ""
+        - "&fDetails:"
+        - "&7- Owned: &a+<own_percent>%"
+        - "&7- Shared: &b+<shared_percent>%"
+
+    prof_summary:
+      slot: 23
+      material: "KNOWLEDGE_BOOK"
+      name: "&6Profession XP Summary"
+      prof_format: "&7- <profession>: &e<multiplier>x &7(+<percent>%)"
+      prof_none: "&7No active profession boosters."
+      lore:
+        - "&7Applied Multipliers:"
+        - ""
+        - "<prof_list>"
+
+    share_button:
+      slot: 49
+      material: "OAK_SIGN"
+      name: "&e&lShare Booster"
+      lore:
+        - "&7Click to select a player"
+        - "&7and share booster benefits."
+        - ""
+        - "&bClick to open menu!"
+
+    offline_toggle_button:
+      slot: 50
+      enabled:
+        name: "&aOffline Share: &2ON"
+        material: "LIME_DYE"
+        lore:
+          - "&7Boosters will remain active for"
+          - "&7shared receivers when you log off."
+          - ""
+          - "&eClick to DISABLE this feature."
+      disabled:
+        name: "&cOffline Share: &4OFF"
+        material: "GRAY_DYE"
+        lore:
+          - "&7Boosters will deactivate for"
+          - "&7shared receivers when you log off."
+          - ""
+          - "&eClick to ENABLE this feature."
+      no_perm:
+        name: "&7Offline Share: &cLocked"
+        material: "BARRIER"
+        lore:
+          - "&7You do not have permission"
+          - "&7to share offline."
+          - ""
+          - "&cRequirement: sincebooster.share.offline"
+
+    status_perm: "&aActive"
+    status_time: "&eExpires in: &f<time_left>"
+    shared_list_none: "&7- (None)"
+    shared_list_format: "&7- &f<player>"
+
+    own:
+      name_time: "&6<id> &7(Left: <time>)"
+      name_perm: "&d&lPERM: &6<id> &7(Permanent)"
+      lore:
+        - "&7Type: <type_color><type_name>"
+        - "&7Multiplier: &e+<percent>%"
+        - ""
+        - "&7Status: <status>"
+        - "&7Sharing with: &f<shared_count> players"
+        - "&7Decay Rate: &c<decay_rate>x/s"
+        - "&7Personal Efficiency: &a<efficiency>%"
+        - ""
+        - "&fShared With:"
+        - "<shared_list>"
+        - ""
+        - "&eClick &7to manage shares."
+
+    received:
+      name_time: "&bShared: &f<id> &7(<time>)"
+      name_perm: "&bShared: &dPERM &f<id>"
+      lore:
+        - "&7Owner: &f<owner_name>"
+        - "&7Type: <type_color><type_name>"
+        - "&7Base Multiplier: &e+<base_multiplier>x"
+        - ""
+        - "&7Receiver Efficiency: &b<efficiency>%"
+        - "&7Actual Multiplier: &a+<real_multiplier>x"
+        - ""
+        - "&7Status: <status>"
+        - ""
+        - "&cShift + Click &7to cancel share."
+
+share_gui:
+  player_selector:
+    title: "&0Select Receiver"
+    size: 54
+    layout:
+      player_slots: [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44 ]
+    items:
+      back_button:
+        slot: 45
+        material: "ARROW"
+        name: "&cBack"
+        lore: [ ]
+      player_head:
+        name: "&e<player_name>"
+        lore:
+          - "&7Click to select this player"
+          - "&7as a share target."
+
+  booster_selector:
+    title: "&0Select Booster to Share"
+    size: 54
+    layout:
+      booster_slots: [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44 ]
+    items:
+      back_button:
+        slot: 45
+        material: "ARROW"
+        name: "&cBack"
+        lore: [ ]
+      booster:
+        name_time: "&6<id> &7(<time>)"
+        name_perm: "&d<id> &7(Permanent)"
+        status_full: "&cFull (<current>/<max>)"
+        status_available: "&aAvailable (<current>/<max>)"
+        lore:
+          - "&7Type: <type_color><type_name>"
+          - "&7Multiplier: &e<multiplier>x &7(+<percent>%)"
+          - ""
+          - "&7Receiver will get: &b<rec_multiplier>x &7(+<rec_percent>%)"
+          - "&7Slots: <slot_color><status_text>"
+          - ""
+          - "&eClick to send invite!"
+
+manage_share:
+  title: "&0Manage Shares"
+  size: 27
+  layout:
+    player_slots: [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26 ]
+  items:
+    empty_slot:
+      slot: 13
+      material: "BARRIER"
+      name: "&cNot Sharing"
+      lore:
+        - "&7This booster is not currently"
+        - "&7being shared with anyone."
+    player_head:
+      name: "&cKick: &f<player>"
+      lore:
+        - "&7Click to kick this player"
+        - "&7from receiving the booster."

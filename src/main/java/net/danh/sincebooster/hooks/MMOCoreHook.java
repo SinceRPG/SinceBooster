@@ -13,6 +13,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+/**
+ * MMOCore integration that calculates experience modifiers for classes and professions dynamically.
+ */
 public class MMOCoreHook implements Listener {
 
     private final SinceBooster plugin;
@@ -28,7 +31,7 @@ public class MMOCoreHook implements Listener {
         Profession profession = e.getProfession();
         double totalMultiplier = 1.0;
 
-        // 1. Quét Booster của chính mình (O(1))
+        // 1. Scan Personal Boosters (O(1))
         List<Booster> myList = plugin.getBoosterManager().getActiveBoosters(myUUID);
         if (myList != null) {
             for (Booster b : myList) {
@@ -38,7 +41,7 @@ public class MMOCoreHook implements Listener {
             }
         }
 
-        // 2. Quét Booster được share (Dùng incomingShares để đạt tốc độ tối đa)
+        // 2. Scan Incoming Shared Boosters (Uses O(1) Cache for Maximum Speed)
         Set<Booster> sharedToMe = plugin.getBoosterManager().getIncomingShares().get(myUUID);
         if (sharedToMe != null) {
             for (Booster b : sharedToMe) {

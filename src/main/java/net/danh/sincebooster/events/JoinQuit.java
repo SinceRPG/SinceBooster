@@ -11,6 +11,9 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Handles initialization and safe memory cleanup when players connect and disconnect.
+ */
 public class JoinQuit implements Listener {
     private final SinceBooster plugin;
 

@@ -7,6 +7,9 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Data model representing a single active booster.
+ */
 public class Booster {
     private final String id;
     private final double multiplier;
@@ -17,7 +20,7 @@ public class Booster {
     private long endTime;
     private double cachedOfflineRate;
 
-    // Constructor 1: Tạo mới (In-game) -> Không cần cache rate (để -1)
+    // Constructor 1: Created newly in-game
     public Booster(String id, double multiplier, long durationSeconds, @Nullable String profession, boolean permanent, UUID ownerUUID) {
         this.id = id;
         this.multiplier = multiplier;
@@ -28,7 +31,7 @@ public class Booster {
         this.cachedOfflineRate = -1.0;
     }
 
-    // Constructor 2: Load từ DB (Cần thêm tham số cachedOfflineRate)
+    // Constructor 2: Loaded from DB
     public Booster(String id, double multiplier, long endTime, @Nullable String profession, boolean permanent, boolean isLoad, UUID ownerUUID, double cachedOfflineRate) {
         this.id = id;
         this.multiplier = multiplier;
@@ -36,10 +39,9 @@ public class Booster {
         this.profession = profession;
         this.permanent = permanent;
         this.ownerUUID = ownerUUID;
-        this.cachedOfflineRate = cachedOfflineRate; // Lưu giá trị cache
+        this.cachedOfflineRate = cachedOfflineRate;
     }
 
-    // [MỚI] Getter
     public double getCachedOfflineRate() {
         return cachedOfflineRate;
     }
@@ -48,7 +50,6 @@ public class Booster {
         this.cachedOfflineRate = rate;
     }
 
-    // ... (Giữ nguyên các method cũ: getOwnerUUID, reduceTime, isValid, v.v...) ...
     public UUID getOwnerUUID() {
         return ownerUUID;
     }
@@ -104,7 +105,6 @@ public class Booster {
         return permanent;
     }
 
-    // ... (Equals & HashCode giữ nguyên) ...
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

@@ -11,6 +11,7 @@ import java.util.*;
 
 /**
  * Handles all database interactions and connection pooling using HikariCP.
+ * Supports both MySQL and local SQLite storage.
  */
 public class DatabaseManager {
 
@@ -25,6 +26,9 @@ public class DatabaseManager {
         createTables();
     }
 
+    /**
+     * Initializes the HikariCP connection pool with optimized parameters.
+     */
     private void setupDataSource() {
         HikariConfig config = new HikariConfig();
 
@@ -39,7 +43,7 @@ public class DatabaseManager {
             config.setUsername(user);
             config.setPassword(pass);
 
-            // Optimal connection properties for MySQL
+            // Optimal connection properties for MySQL to prevent JIT and GC lag spikes
             config.addDataSourceProperty("cachePrepStmts", "true");
             config.addDataSourceProperty("prepStmtCacheSize", "250");
             config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
@@ -72,6 +76,9 @@ public class DatabaseManager {
         }
     }
 
+    /**
+     * Creates the necessary tables upon startup if they do not exist.
+     */
     private void createTables() {
         try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
             String usersTable = getUsersTable();
@@ -90,12 +97,25 @@ public class DatabaseManager {
                     """.formatted(usersTable);
             stmt.execute(sqlUsers);
 
-            String sqlBoosters = getString(boostersTable);
+            String autoInc = isMySQL ? "AUTO_INCREMENT" : "AUTOINCREMENT";
+            String sqlBoosters = """
+                    CREATE TABLE IF NOT EXISTS %s (
+                        id INTEGER PRIMARY KEY %s,
+                        uuid VARCHAR(36) NOT NULL,
+                        booster_id VARCHAR(64) NOT NULL,
+                        multiplier DOUBLE NOT NULL,
+                        profession VARCHAR(64),
+                        is_permanent BOOLEAN NOT NULL,
+                        remaining_time BIGINT NOT NULL,
+                        shared_with TEXT
+                    );
+                    """.formatted(boostersTable, autoInc);
             stmt.execute(sqlBoosters);
 
             try {
                 stmt.execute("CREATE INDEX IF NOT EXISTS idx_booster_uuid ON " + boostersTable + " (uuid);");
             } catch (SQLException ignored) {
+                // Index might already exist
             }
 
         } catch (SQLException e) {
@@ -104,22 +124,9 @@ public class DatabaseManager {
         }
     }
 
-    private String getString(String boostersTable) {
-        String autoInc = isMySQL ? "AUTO_INCREMENT" : "AUTOINCREMENT";
-        return """
-                CREATE TABLE IF NOT EXISTS %s (
-                    id INTEGER PRIMARY KEY %s,
-                    uuid VARCHAR(36) NOT NULL,
-                    booster_id VARCHAR(64) NOT NULL,
-                    multiplier DOUBLE NOT NULL,
-                    profession VARCHAR(64),
-                    is_permanent BOOLEAN NOT NULL,
-                    remaining_time BIGINT NOT NULL,
-                    shared_with TEXT
-                );
-                """.formatted(boostersTable, autoInc);
-    }
-
+    /**
+     * Retrieves boosters shared by offline players intended for a specific receiver.
+     */
     public Map<UUID, List<Booster>> getIncomingOfflineShares(UUID receiverId) {
         Map<UUID, List<Booster>> result = new HashMap<>();
         String query = "SELECT b.*, u.offline_share_enabled, u.offline_share_rate FROM " + getBoostersTable() + " b " +

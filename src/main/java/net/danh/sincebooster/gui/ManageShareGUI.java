@@ -26,6 +26,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * GUI for managing players that a specific booster is shared with.
+ * Layout completely derived from gui.yml.
+ */
 public class ManageShareGUI implements Listener {
     private final SinceBooster plugin;
     private final NamespacedKey targetKey;
@@ -33,6 +37,10 @@ public class ManageShareGUI implements Listener {
     public ManageShareGUI(SinceBooster plugin) {
         this.plugin = plugin;
         this.targetKey = new NamespacedKey(plugin, "manage_target_uuid");
+    }
+
+    private ConfigUtils getGui() {
+        return plugin.getGuiFile();
     }
 
     private ConfigUtils getMsg() {
@@ -54,21 +62,24 @@ public class ManageShareGUI implements Listener {
                 }
             }
         }
-
         if (booster == null) return;
 
-        String title = getMsg().getString("manage_share_gui.title", "Manage Shares");
+        String title = getGui().getString("manage_share.title", "Manage Shares");
+        int size = getGui().getInt("manage_share.size", 27);
         ManageHolder holder = new ManageHolder(boosterId);
-        Inventory inv = Bukkit.createInventory(holder, 27, ColorUtils.parse(title));
+        Inventory inv = Bukkit.createInventory(holder, size, ColorUtils.parse(title));
         holder.setInventory(inv);
 
-        int slot = 0;
+        List<Integer> playerSlots = getGui().getConfig().getIntegerList("manage_share.layout.player_slots");
+        int slotIdx = 0;
+
         if (booster.getSharedPlayers().isEmpty()) {
-            inv.setItem(13, createEmptyItem());
+            inv.setItem(getGui().getInt("manage_share.items.empty_slot.slot", 13), createEmptyItem());
         } else {
             for (UUID targetUUID : booster.getSharedPlayers()) {
+                if (slotIdx >= playerSlots.size()) break;
                 OfflinePlayer target = Bukkit.getOfflinePlayer(targetUUID);
-                inv.setItem(slot++, createPlayerHead(target));
+                inv.setItem(playerSlots.get(slotIdx++), createPlayerHead(target));
             }
         }
 
@@ -80,11 +91,11 @@ public class ManageShareGUI implements Listener {
         SkullMeta meta = (SkullMeta) item.getItemMeta();
         meta.setOwningPlayer(target);
 
-        String name = getMsg().getString("manage_share_gui.item_name").replace("<player>", target.getName() != null ? target.getName() : "Unknown");
+        String name = getGui().getString("manage_share.items.player_head.name").replace("<player>", target.getName() != null ? target.getName() : "Unknown");
         meta.displayName(ColorUtils.parse(name));
 
         List<Component> lore = new ArrayList<>();
-        for (String s : getMsg().getConfig().getStringList("manage_share_gui.lore")) {
+        for (String s : getGui().getConfig().getStringList("manage_share.items.player_head.lore")) {
             lore.add(ColorUtils.parse(s));
         }
         meta.lore(lore);
@@ -95,11 +106,12 @@ public class ManageShareGUI implements Listener {
     }
 
     private ItemStack createEmptyItem() {
-        ItemStack item = new ItemStack(Material.BARRIER);
+        String matName = getGui().getString("manage_share.items.empty_slot.material", "BARRIER");
+        ItemStack item = new ItemStack(Material.valueOf(matName));
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(ColorUtils.parse(getMsg().getString("manage_share_gui.empty.name", "&cNo Shares Active")));
+        meta.displayName(ColorUtils.parse(getGui().getString("manage_share.items.empty_slot.name", "&cNo Shares Active")));
         List<Component> lore = new ArrayList<>();
-        for (String s : getMsg().getConfig().getStringList("manage_share_gui.empty.lore"))
+        for (String s : getGui().getConfig().getStringList("manage_share.items.empty_slot.lore"))
             lore.add(ColorUtils.parse(s));
         meta.lore(lore);
         item.setItemMeta(meta);
@@ -112,7 +124,6 @@ public class ManageShareGUI implements Listener {
         if (!(e.getInventory().getHolder(false) instanceof ManageHolder holder)) return;
 
         e.setCancelled(true);
-
         if (e.getClickedInventory() != e.getView().getTopInventory()) return;
 
         ItemStack item = e.getCurrentItem();
@@ -127,27 +138,18 @@ public class ManageShareGUI implements Listener {
             ItemMeta meta = item.getItemMeta();
             if (meta.getPersistentDataContainer().has(targetKey, PersistentDataType.STRING)) {
                 String uuidStr = meta.getPersistentDataContainer().get(targetKey, PersistentDataType.STRING);
-                UUID targetUUID = null;
                 if (uuidStr != null) {
-                    targetUUID = UUID.fromString(uuidStr);
+                    OfflinePlayer target = Bukkit.getOfflinePlayer(UUID.fromString(uuidStr));
+                    plugin.getBoosterManager().getShareManager().kickShare(p, holder.getBoosterId(), target);
+                    open(p, holder.getBoosterId());
                 }
-                OfflinePlayer target = null;
-                if (targetUUID != null) {
-                    target = Bukkit.getOfflinePlayer(targetUUID);
-                }
-
-                plugin.getBoosterManager().getShareManager().kickShare(p, holder.getBoosterId(), target);
-
-                open(p, holder.getBoosterId());
             }
         }
     }
 
     @EventHandler
     public void onDrag(InventoryDragEvent e) {
-        if (e.getInventory().getHolder(false) instanceof ManageHolder) {
-            e.setCancelled(true);
-        }
+        if (e.getInventory().getHolder(false) instanceof ManageHolder) e.setCancelled(true);
     }
 
     public static class ManageHolder implements InventoryHolder {

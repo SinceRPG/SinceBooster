@@ -1,5 +1,5 @@
 name: SinceBooster
-version: '1.0'
+version: '1.1'
 main: net.danh.sincebooster.SinceBooster
 api-version: '1.21'
 authors: [ VoChiDanh ]
@@ -14,5 +14,11 @@ dependencies:
       required: true
 permissions:
   sincebooster.admin:
-    description: Admin access
+    description: Admin access to bypass configurations and force booster actions.
     default: op
+  sincebooster.share:
+    description: Allows players to share boosters with others.
+    default: true
+  sincebooster.share.offline:
+    description: Allows boosters to stay active for receivers when the owner logs out.
+    default: false

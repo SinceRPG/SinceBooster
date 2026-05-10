@@ -37,10 +37,7 @@ public class BoosterManager {
     public void loadPlayerBoosters(UUID ownerId, List<Booster> boosters) {
         List<Booster> safeList = new CopyOnWriteArrayList<>(boosters);
         activeBoosters.put(ownerId, safeList);
-
-        for (Booster b : safeList) {
-            refreshIncomingCache(b);
-        }
+        for (Booster b : safeList) refreshIncomingCache(b);
     }
 
     public void unloadPlayerBoosters(UUID ownerId) {
@@ -144,10 +141,7 @@ public class BoosterManager {
 
         List<Booster> safeList = new CopyOnWriteArrayList<>(boosters);
         activeBoosters.put(ownerId, safeList);
-
-        for (Booster b : safeList) {
-            refreshIncomingCache(b);
-        }
+        for (Booster b : safeList) refreshIncomingCache(b);
 
         plugin.getLogger().info(plugin.getMessagesFile().getString("log.temp_load_boosters", "Temporarily loaded <count> boosters for <uuid> to process offline sharing.").replace("<count>", String.valueOf(boosters.size())).replace("<uuid>", ownerId.toString()));
     }
@@ -198,7 +192,6 @@ public class BoosterManager {
                     getShareManager().kickShare(target, toRemove.getId(), receiver);
                 }
             }
-
             boosters.remove(toRemove);
             return true;
         }
@@ -210,10 +203,7 @@ public class BoosterManager {
         if (boosters == null || boosters.isEmpty()) return;
 
         List<Booster> copy = new ArrayList<>(boosters);
-
-        for (Booster b : copy) {
-            removeBooster(target, b.getId());
-        }
+        for (Booster b : copy) removeBooster(target, b.getId());
     }
 
     public Map<UUID, List<Booster>> getActiveBoosters() {

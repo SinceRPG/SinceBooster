@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
 
 /**
  * Handles saving, loading, and memory management for player Booster sessions.
+ * Caches sessions dynamically to minimize main-thread database hits.
  */
 public class PlayerDataHandler {
     private final SinceBooster plugin;
@@ -26,6 +27,9 @@ public class PlayerDataHandler {
         this.plugin = plugin;
     }
 
+    /**
+     * Loads a player's data asynchronously upon joining.
+     */
     public void loadData(@NotNull Player p) {
         UUID uuid = p.getUniqueId();
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
@@ -183,7 +187,6 @@ public class PlayerDataHandler {
                         ps.executeBatch();
                     }
                 }
-
                 conn.commit();
 
             } catch (SQLException e) {
@@ -201,7 +204,6 @@ public class PlayerDataHandler {
 
     public void forceLoadSession(UUID uuid) {
         if (sessionMap.containsKey(uuid)) return;
-
         PlayerSession session = loadSessionFromDatabase(uuid);
         sessionMap.put(uuid, session);
         plugin.getBoosterManager().loadPlayerBoosters(uuid, session.getBoosters());

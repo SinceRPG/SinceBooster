@@ -11,6 +11,9 @@ import org.bukkit.scheduler.BukkitRunnable;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Handles the logic for sending, receiving, and managing shared boosters between players.
+ */
 public class ShareManager {
     private final SinceBooster plugin;
     private final Map<UUID, Map<UUID, List<String>>> pendingInvites = new ConcurrentHashMap<>();
@@ -32,7 +35,7 @@ public class ShareManager {
         this.globalReceiverBuff = plugin.getConfigFile().getDouble("share.default-receiver-buff", 0.25);
         this.globalShareLimit = plugin.getConfigFile().getInt("share.default-share-limit", 1);
         this.offlineShareEnabled = plugin.getConfigFile().getBoolean("share.offline.enabled", false);
-        this.globalOfflineRate = plugin.getConfigFile().getDouble("share.offline.default-offline-rate", 0.25);
+        this.globalOfflineRate = plugin.getConfigFile().getBoolean("share.offline.enabled") ? plugin.getConfigFile().getDouble("share.offline.default-offline-rate", 0.25) : 0.0;
     }
 
     public void refreshOfflineShares(Player receiver) {
@@ -43,7 +46,6 @@ public class ShareManager {
 
             if (!shares.isEmpty()) {
                 offlineSharesCache.put(receiver.getUniqueId(), shares);
-
                 shares.keySet().forEach(ownerId -> {
                     if (Bukkit.getPlayer(ownerId) == null) {
                         plugin.getPlayerDataHandler().forceLoadSession(ownerId);
@@ -96,28 +98,17 @@ public class ShareManager {
         if (boosters == null || boosters.isEmpty()) return;
 
         List<Booster> offlineList = new ArrayList<>(boosters);
-
         Set<UUID> onlineReceivers = new HashSet<>();
+
         for (Booster b : offlineList) {
             for (UUID uid : b.getSharedPlayers()) {
-                if (Bukkit.getPlayer(uid) != null) {
-                    onlineReceivers.add(uid);
-                }
+                if (Bukkit.getPlayer(uid) != null) onlineReceivers.add(uid);
             }
         }
 
         for (UUID receiverId : onlineReceivers) {
-            offlineSharesCache.computeIfAbsent(receiverId, k -> new ConcurrentHashMap<>())
-                    .put(owner.getUniqueId(), offlineList);
+            offlineSharesCache.computeIfAbsent(receiverId, k -> new ConcurrentHashMap<>()).put(owner.getUniqueId(), offlineList);
         }
-    }
-
-    public boolean checkSharePermission(Player p) {
-        if (!p.hasPermission("sincebooster.share")) {
-            p.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.no_permission", "You do not have permission to use the share feature.")));
-            return false;
-        }
-        return true;
     }
 
     public double getReceiverMultiplier(Booster b, UUID receiverId) {
@@ -129,9 +120,7 @@ public class ShareManager {
             if (s != null && s.getReceiverBuffRate() >= 0) return s.getReceiverBuffRate();
             return globalReceiverBuff;
         } else if (offlineShareEnabled) {
-            if (b.getCachedOfflineRate() >= 0) {
-                return b.getCachedOfflineRate();
-            }
+            if (b.getCachedOfflineRate() >= 0) return b.getCachedOfflineRate();
             return globalOfflineRate;
         }
         return 0.0;
@@ -214,18 +203,9 @@ public class ShareManager {
         String formatKey = b.isPermanent() ? "share.format.permanent" : "share.format.duration";
         String format = plugin.getMessagesFile().getString(formatKey, "<id> (x<mult>)");
         long left = (b.getEndTime() - System.currentTimeMillis()) / 1000;
-        String timeStr = formatTime(Math.max(0, left));
-        return format.replace("<id>", b.getId().toUpperCase())
-                .replace("<mult>", String.valueOf(b.getMultiplier()))
-                .replace("<time>", timeStr);
-    }
-
-    private String formatTime(long seconds) {
-        long d = seconds / 86400;
-        long h = (seconds % 86400) / 3600;
-        long m = (seconds % 3600) / 60;
-        long s = seconds % 60;
-        return d + "d " + h + "h " + m + "m " + s + "s";
+        long d = left / 86400, h = (left % 86400) / 3600, m = (left % 3600) / 60, s = left % 60;
+        String timeStr = d + "d " + h + "h " + m + "m " + s + "s";
+        return format.replace("<id>", b.getId().toUpperCase()).replace("<mult>", String.valueOf(b.getMultiplier())).replace("<time>", timeStr);
     }
 
     public void sendInviteBatch(Player sender, Player receiver, List<Booster> boosters) {
@@ -279,9 +259,7 @@ public class ShareManager {
         new BukkitRunnable() {
             @Override
             public void run() {
-                if (pendingInvites.containsKey(rId)) {
-                    pendingInvites.get(rId).remove(sId);
-                }
+                if (pendingInvites.containsKey(rId)) pendingInvites.get(rId).remove(sId);
             }
         }.runTaskLater(plugin, 60 * 20L);
     }
@@ -376,9 +354,7 @@ public class ShareManager {
         }
         Player ownerP = owner.getPlayer();
         List<Booster> boosters = null;
-        if (ownerP != null) {
-            boosters = plugin.getBoosterManager().getActiveBoosters(ownerP.getUniqueId());
-        }
+        if (ownerP != null) boosters = plugin.getBoosterManager().getActiveBoosters(ownerP.getUniqueId());
         boolean leftAny = false;
 
         if (boosters != null) {

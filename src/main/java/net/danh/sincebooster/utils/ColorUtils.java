@@ -8,6 +8,9 @@ import org.jetbrains.annotations.NotNull;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Handles legacy and MiniMessage color code conversions.
+ */
 public class ColorUtils {
     private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
     private static final Pattern HEX_PATTERN = Pattern.compile("&#([a-fA-F0-9]{6})");
@@ -21,7 +24,6 @@ public class ColorUtils {
         return parse(prefix + input);
     }
 
-    // ... Copy legacy conversion logic from original ...
     public static String convertLegacyToMiniMessage(String text) {
         if (text == null) return "";
         text = text.replace("§", "&");

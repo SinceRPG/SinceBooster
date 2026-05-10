@@ -25,6 +25,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Multi-stage GUI for selecting a player and a booster to share.
+ * Loads purely from gui.yml.
+ */
 public class ShareGUI implements Listener {
 
     private final SinceBooster plugin;
@@ -35,69 +39,77 @@ public class ShareGUI implements Listener {
         this.boosterIdKey = new NamespacedKey(plugin, "gui_booster_id");
     }
 
+    private ConfigUtils getGui() {
+        return plugin.getGuiFile();
+    }
+
     private ConfigUtils getMsg() {
         return plugin.getMessagesFile();
     }
 
     public void openPlayerSelector(Player p) {
         if (!p.hasPermission("sincebooster.share")) {
-            p.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.no_permission")));
+            p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.no_permission")));
             return;
         }
-        String titleStr = getMsg().getString("share_gui.player_selector.title", "Select a Player");
+        String titleStr = getGui().getString("share_gui.player_selector.title", "Select a Player");
+        int size = getGui().getInt("share_gui.player_selector.size", 54);
         PlayerSelectorHolder holder = new PlayerSelectorHolder();
-        Inventory inv = Bukkit.createInventory(holder, 54, ColorUtils.parse(titleStr));
+        Inventory inv = Bukkit.createInventory(holder, size, ColorUtils.parse(titleStr));
         holder.setInventory(inv);
 
-        int slot = 0;
+        List<Integer> slots = getGui().getConfig().getIntegerList("share_gui.player_selector.layout.player_slots");
+        int slotIdx = 0;
+
         for (Player target : Bukkit.getOnlinePlayers()) {
             if (target.getUniqueId().equals(p.getUniqueId())) continue;
-            if (slot >= 53) break;
+            if (slotIdx >= slots.size()) break;
 
             ItemStack head = new ItemStack(Material.PLAYER_HEAD);
             SkullMeta meta = (SkullMeta) head.getItemMeta();
             meta.setOwningPlayer(target);
 
-            String nameFormat = getMsg().getString("share_gui.player_selector.item_name", "<yellow><player_name>");
+            String nameFormat = getGui().getString("share_gui.player_selector.items.player_head.name", "<yellow><player_name>");
             meta.displayName(ColorUtils.parse(nameFormat.replace("<player_name>", target.getName())));
 
             List<Component> lore = new ArrayList<>();
-            for (String s : getMsg().getConfig().getStringList("share_gui.player_selector.lore")) {
+            for (String s : getGui().getConfig().getStringList("share_gui.player_selector.items.player_head.lore")) {
                 lore.add(ColorUtils.parse(s));
             }
             meta.lore(lore);
             head.setItemMeta(meta);
 
-            inv.setItem(slot++, head);
+            inv.setItem(slots.get(slotIdx++), head);
         }
-        inv.setItem(45, createBackButton());
+        inv.setItem(getGui().getInt("share_gui.player_selector.items.back_button.slot"), createBackButton());
         p.openInventory(inv);
     }
 
     public void openBoosterSelector(Player p, Player target) {
         if (!p.hasPermission("sincebooster.share")) {
-            p.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.no_permission")));
+            p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.no_permission")));
             return;
         }
-        String titleStr = getMsg().getString("share_gui.booster_selector.title", "Select a Booster");
+        String titleStr = getGui().getString("share_gui.booster_selector.title", "Select a Booster");
+        int size = getGui().getInt("share_gui.booster_selector.size", 54);
         BoosterSelectorHolder holder = new BoosterSelectorHolder(target.getUniqueId());
-        Inventory inv = Bukkit.createInventory(holder, 54, ColorUtils.parse(titleStr));
+        Inventory inv = Bukkit.createInventory(holder, size, ColorUtils.parse(titleStr));
         holder.setInventory(inv);
 
         List<Booster> boosters = plugin.getBoosterManager().getActiveBoosters(p.getUniqueId());
+        List<Integer> slots = getGui().getConfig().getIntegerList("share_gui.booster_selector.layout.booster_slots");
+
         if (boosters != null) {
-            int slot = 0;
+            int slotIdx = 0;
             int maxShare = plugin.getBoosterManager().getShareManager().getPlayerShareLimit(p);
 
             for (Booster b : boosters) {
                 if (!b.isValid()) continue;
-                if (slot >= 53) break;
-
-                ItemStack item = createDetailedShareItem(b, p, maxShare);
-                inv.setItem(slot++, item);
+                if (slotIdx >= slots.size()) break;
+                inv.setItem(slots.get(slotIdx++), createDetailedShareItem(b, p, maxShare));
             }
         }
-        inv.setItem(45, createBackButton());
+        inv.setItem(getGui().getInt("share_gui.booster_selector.items.back_button.slot"), createBackButton());
         p.openInventory(inv);
     }
 
@@ -109,16 +121,16 @@ public class ShareGUI implements Listener {
         meta.getPersistentDataContainer().set(boosterIdKey, PersistentDataType.STRING, b.getId());
 
         String keyDur = b.isPermanent() ? "name_perm" : "name_time";
-        String basePath = "share_gui.booster_selector.item.";
+        String basePath = "share_gui.booster_selector.items.booster.";
 
         long left = (b.getEndTime() - System.currentTimeMillis()) / 1000;
         String timeStr = formatTime(Math.max(0, left));
         String id = b.getId().toUpperCase();
 
-        String name = getMsg().getString(basePath + keyDur);
+        String name = getGui().getString(basePath + keyDur);
         if (name != null) meta.displayName(ColorUtils.parse(name.replace("<id>", id).replace("<time>", timeStr)));
 
-        List<String> loreRaw = getMsg().getConfig().getStringList(basePath + "lore");
+        List<String> loreRaw = getGui().getConfig().getStringList(basePath + "lore");
         List<Component> lore = new ArrayList<>();
 
         String typeColor = (b.getProfession() == null) ? "<aqua>" : "<green>";
@@ -132,7 +144,7 @@ public class ShareGUI implements Listener {
         int currentShare = b.getSharedPlayers().size();
         boolean isFull = currentShare >= maxShare;
         String slotColor = isFull ? "<red>" : "<green>";
-        String statusText = getMsg().getString(isFull ? "share_gui.booster_selector.item.status_full" : "share_gui.booster_selector.item.status_available");
+        String statusText = getGui().getString(isFull ? basePath + "status_full" : basePath + "status_available");
         statusText = statusText.replace("<current>", String.valueOf(currentShare)).replace("<max>", String.valueOf(maxShare));
 
         for (String line : loreRaw) {
@@ -151,7 +163,6 @@ public class ShareGUI implements Listener {
                 lore.add(ColorUtils.parse(line));
             }
         }
-
         meta.lore(lore);
         item.setItemMeta(meta);
         return item;
@@ -160,10 +171,7 @@ public class ShareGUI implements Listener {
     private String getBoosterIdFromItem(ItemStack item) {
         if (item == null || !item.hasItemMeta()) return null;
         ItemMeta meta = item.getItemMeta();
-        if (meta.getPersistentDataContainer().has(boosterIdKey, PersistentDataType.STRING)) {
-            return meta.getPersistentDataContainer().get(boosterIdKey, PersistentDataType.STRING);
-        }
-        return null;
+        return meta.getPersistentDataContainer().getOrDefault(boosterIdKey, PersistentDataType.STRING, null);
     }
 
     @EventHandler
@@ -178,7 +186,7 @@ public class ShareGUI implements Listener {
             if (e.getClickedInventory() != e.getView().getTopInventory()) return;
 
             if (isBackButton(item)) {
-                new BoosterGUI(plugin).open(p);
+                plugin.getBoosterGUI().open(p);
                 return;
             }
 
@@ -211,7 +219,6 @@ public class ShareGUI implements Listener {
             } else {
                 p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.invalid_target", "&cPlayer is no longer online!")));
             }
-
             p.closeInventory();
         }
     }
@@ -219,32 +226,26 @@ public class ShareGUI implements Listener {
     @EventHandler
     public void onDrag(InventoryDragEvent e) {
         InventoryHolder holder = e.getInventory().getHolder(false);
-        if (holder instanceof PlayerSelectorHolder || holder instanceof BoosterSelectorHolder) {
-            e.setCancelled(true);
-        }
+        if (holder instanceof PlayerSelectorHolder || holder instanceof BoosterSelectorHolder) e.setCancelled(true);
     }
 
     private ItemStack createBackButton() {
-        String mat = getMsg().getString("share_gui.back_button.material", "ARROW");
+        String mat = getGui().getString("share_gui.items.back_button.material", "ARROW");
         ItemStack item = new ItemStack(Material.valueOf(mat));
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(ColorUtils.parse(getMsg().getString("share_gui.back_button.name", "&cBack")));
+        meta.displayName(ColorUtils.parse(getGui().getString("share_gui.items.back_button.name", "&cBack")));
         item.setItemMeta(meta);
         return item;
     }
 
     private boolean isBackButton(ItemStack item) {
-        String matName = getMsg().getString("share_gui.back_button.material", "ARROW");
+        String matName = getGui().getString("share_gui.items.back_button.material", "ARROW");
         return item.getType().name().equals(matName);
     }
 
     private String formatTime(long seconds) {
-        long d = seconds / 86400;
-        long h = (seconds % 86400) / 3600;
-        long m = (seconds % 3600) / 60;
-        long s = seconds % 60;
-        String format = getMsg().getString("booster.gui.formats.time_left");
-        return format.replace("<day>", String.valueOf(d)).replace("<hour>", String.valueOf(h)).replace("<min>", String.valueOf(m)).replace("<sec>", String.valueOf(s));
+        long d = seconds / 86400, h = (seconds % 86400) / 3600, m = (seconds % 3600) / 60, s = seconds % 60;
+        return getGui().getString("booster_list.formats.time_left").replace("<day>", String.valueOf(d)).replace("<hour>", String.valueOf(h)).replace("<min>", String.valueOf(m)).replace("<sec>", String.valueOf(s));
     }
 
     public static class PlayerSelectorHolder implements InventoryHolder {

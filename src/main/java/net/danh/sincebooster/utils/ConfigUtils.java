@@ -9,6 +9,9 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
+/**
+ * Standard utility wrapper to load, save, and handle default configurations seamlessly.
+ */
 public class ConfigUtils {
     private final SinceBooster plugin;
     private final String name;
@@ -49,7 +52,6 @@ public class ConfigUtils {
     public void reload() {
         load();
     }
-
 
     public String getString(String path) {
         return config.getString(path, "");
