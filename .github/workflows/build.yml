@@ -7,10 +7,11 @@ on:
     branches:
       - '**'
 
-# Define all global environment variables (Removed hardcoded values from scripts)
+# Define all global environment variables
 env:
-  # Webhook URLs and Thread IDs
-  DISCORD_WEBHOOK_URL: "https://discord.com/api/webhooks/1471469221614583810/pfMtLyRbTDKiUGMJyVBjhhJ3RDgQelOX71iMGqWg3HdrlokqBJSt1Ox3aC4yTkkGtZ-_?thread_id=1471468999282786397"
+  # Base Webhook URL (NO ?thread_id AT THE END)
+  WEBHOOK_URL: "https://discord.com/api/webhooks/1471469221614583810/pfMtLyRbTDKiUGMJyVBjhhJ3RDgQelOX71iMGqWg3HdrlokqBJSt1Ox3aC4yTkkGtZ-_"
+  THREAD_ID: "1471468999282786397"
 
   # Gradle Settings
   GRADLE_OPTS: "-Dorg.gradle.daemon=false"
@@ -21,8 +22,13 @@ env:
   BOT_USERNAME: "SinceBooster Build"
 
   # Embed Colors (Decimal format)
-  COLOR_SUCCESS: "5763719" # Green
-  COLOR_FAIL: "15548997"   # Red
+  COLOR_PENDING: "16766720" # Yellow
+  COLOR_SUCCESS: "5763719"  # Green
+  COLOR_FAIL: "15548997"    # Red
+
+  # Default Texts
+  NO_CHANGELOG_TEXT: "No specific changelog provided."
+  FAIL_DESC_TEXT: "A syntax or compilation error occurred. Please check the GitHub Actions Console."
 
 jobs:
   build_and_notify:
@@ -30,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # --- PREPARE ENVIRONMENT ---
+      # --- STEP 0: PREPARE ENVIRONMENT ---
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
@@ -43,23 +49,10 @@ jobs:
           java-version: '21'
           cache: 'gradle' # Automatically handles Gradle caching
 
-      # --- ACTUAL BUILD PROCESS ---
-      - name: Build with Gradle
+      # --- STEP 1: NOTIFY BUILD START ---
+      - name: Notify Start to Discord
+        id: notify_start
         run: |
-          # Use Gradle Wrapper if available, otherwise fallback to system Gradle
-          if [ -f "./gradlew" ]; then
-             chmod +x ./gradlew
-             ./gradlew clean build
-          else
-             gradle clean build
-          fi
-
-      # --- NOTIFY SUCCESS ---
-      # Runs only if the 'Build with Gradle' step passes without errors
-      - name: Notify Success & Upload JAR to Discord
-        if: success()
-        run: |
-          # 1. EXTRACT COMMIT AND GRADLE INFORMATION
           COMMIT_MSG=$(git log -1 --pretty=%B)
           AUTHOR=$(git log -1 --pretty=%an)
           HASH=$(git log -1 --pretty=%h)
@@ -67,89 +60,130 @@ jobs:
 
           if [ -f "./gradlew" ]; then GRADLE_CMD="./gradlew"; else GRADLE_CMD="gradle"; fi
           VERSION=$($GRADLE_CMD properties -q | grep "^version:" | awk '{print $2}' || echo "Unknown")
-          NAME=$($GRADLE_CMD properties -q | grep "^name:" | awk '{print $2}' || echo "Plugin")
+          
+          # Handle empty changelog
+          [ -z "$(echo "$COMMIT_MSG" | tr -d '[:space:]')" ] && COMMIT_MSG="$NO_CHANGELOG_TEXT"
 
-          # 2. GENERATE JSON EMBED PAYLOAD (SUCCESS)
+          # CREATE PENDING MESSAGE
           jq -n \
-            --arg author "$AUTHOR pushed an update for $NAME" \
+            --arg author "$AUTHOR triggered a build for SinceBooster" \
             --arg desc "$COMMIT_MSG" \
-            --arg footer "Build Success • Version $VERSION • $HASH" \
+            --arg footer "Version $VERSION • $HASH" \
             --arg timestamp "$TIMESTAMP" \
             --arg icon "$ICON_URL" \
             --arg thumb "$THUMBNAIL_URL" \
             --arg bot_name "$BOT_USERNAME" \
-            --argjson color "$COLOR_SUCCESS" \
+            --argjson color "$COLOR_PENDING" \
             '{
               username: $bot_name,
               avatar_url: $icon,
               embeds: [{
                 color: $color,
                 author: { name: $author, icon_url: $icon },
-                title: "Build Successful & Ready!",
+                title: "⏳ Building...",
                 description: $desc,
                 thumbnail: { url: $thumb },
                 footer: { text: $footer },
                 timestamp: $timestamp
               }]
-            }' > success_payload.json
+            }' > build_start.json
 
-          # 3. SEND EMBED MESSAGE
-          curl -s -H "Content-Type: application/json" -d @success_payload.json "$DISCORD_WEBHOOK_URL"
-          
-          # 4. UPLOAD JAR FILE
-          JAR_FILE=$(find build/libs -maxdepth 1 -name "*.jar" ! -name "*-sources.jar" ! -name "*-javadoc.jar" | head -n 1)
-          if [ -n "$JAR_FILE" ] && [ -f "$JAR_FILE" ]; then
-            echo "Uploading $JAR_FILE..."
-            curl -s -X POST -F "file=@$JAR_FILE" "$DISCORD_WEBHOOK_URL"
+          # Send message and extract ID, save to GITHUB_ENV
+          RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" -d @build_start.json "${WEBHOOK_URL}?thread_id=${THREAD_ID}&wait=true")
+          MSG_ID=$(echo $RESPONSE | jq -r '.id')
+          if [ "$MSG_ID" != "null" ]; then echo "MSG_ID=$MSG_ID" >> $GITHUB_ENV; fi
+
+      # --- STEP 2: ACTUAL BUILD PROCESS ---
+      - name: Build with Gradle
+        run: |
+          if [ -f "./gradlew" ]; then
+             chmod +x ./gradlew
+             ./gradlew clean build
           else
-            echo "Jar file not found in build/libs/!"
+             gradle clean build
           fi
 
-      # --- NOTIFY FAILURE ---
-      # Runs only if any previous step fails (e.g., compilation error)
-      - name: Notify Failure to Discord
-        if: failure()
+      # --- STEP 3A: NOTIFY BUILD SUCCESS ---
+      - name: Notify Success & Upload JAR to Discord
+        if: success()
         run: |
-          # 1. EXTRACT COMMIT AND GRADLE INFORMATION
+          COMMIT_MSG=$(git log -1 --pretty=%B)
           AUTHOR=$(git log -1 --pretty=%an)
           HASH=$(git log -1 --pretty=%h)
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           
-          # GitHub Actions equivalent of CI_PROJECT_URL/-/jobs/CI_JOB_ID
-          JOB_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-
           if [ -f "./gradlew" ]; then GRADLE_CMD="./gradlew"; else GRADLE_CMD="gradle"; fi
-          NAME=$($GRADLE_CMD properties -q | grep "^name:" | awk '{print $2}' || echo "Plugin")
+          VERSION=$($GRADLE_CMD properties -q | grep "^version:" | awk '{print $2}' || echo "Unknown")
+          
+          [ -z "$(echo "$COMMIT_MSG" | tr -d '[:space:]')" ] && COMMIT_MSG="$NO_CHANGELOG_TEXT"
 
-          # 2. GENERATE JSON EMBED PAYLOAD (FAILURE)
-          jq -n \
-            --arg author "$AUTHOR broke the build for $NAME!" \
-            --arg desc "The build failed. Please check the console logs." \
-            --arg url "$JOB_URL" \
-            --arg footer "Build Failed • $HASH" \
-            --arg timestamp "$TIMESTAMP" \
-            --arg icon "$ICON_URL" \
-            --arg bot_name "$BOT_USERNAME" \
-            --argjson color "$COLOR_FAIL" \
-            '{
-              username: $bot_name,
-              avatar_url: $icon,
-              embeds: [{
-                color: $color,
-                author: { name: $author, icon_url: $icon },
-                title: "Build Failed ❌",
-                url: $url,
-                description: $desc,
-                footer: { text: $footer },
-                timestamp: $timestamp
-              }]
-            }' > fail_payload.json
+          # EDIT MESSAGE ON SUCCESS
+          if [ -n "$MSG_ID" ]; then
+            jq -n \
+              --arg author "$AUTHOR pushed an update for SinceBooster" \
+              --arg desc "$COMMIT_MSG" \
+              --arg footer "Version $VERSION • $HASH" \
+              --arg timestamp "$TIMESTAMP" \
+              --arg icon "$ICON_URL" \
+              --arg thumb "$THUMBNAIL_URL" \
+              --argjson color "$COLOR_SUCCESS" \
+              '{
+                embeds: [{
+                  color: $color,
+                  author: { name: $author, icon_url: $icon },
+                  title: "Build Successful! 🚀",
+                  description: $desc,
+                  thumbnail: { url: $thumb },
+                  footer: { text: $footer },
+                  timestamp: $timestamp
+                }]
+              }' > build_success.json
 
-          # 3. SEND FAILURE ALERT
-          curl -s -H "Content-Type: application/json" -d @fail_payload.json "$DISCORD_WEBHOOK_URL"
+            JAR_FILE=$(find build/libs -maxdepth 1 -name "*.jar" ! -name "*-sources.jar" ! -name "*-javadoc.jar" | head -n 1)
+            if [ -n "$JAR_FILE" ] && [ -f "$JAR_FILE" ]; then
+              curl -s -X PATCH -F "payload_json=<build_success.json;type=application/json" -F "file=@$JAR_FILE" "${WEBHOOK_URL}/messages/${MSG_ID}?thread_id=${THREAD_ID}"
+            else
+              curl -s -X PATCH -H "Content-Type: application/json" -d @build_success.json "${WEBHOOK_URL}/messages/${MSG_ID}?thread_id=${THREAD_ID}"
+            fi
+          fi
 
-      # --- UPLOAD ARTIFACTS TO GITHUB ---
-      # Keeps the JAR available for manual download inside the GitHub Actions UI
+      # --- STEP 3B: NOTIFY BUILD FAILURE ---
+      - name: Notify Failure to Discord
+        if: failure()
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          HASH=$(git log -1 --pretty=%h)
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          
+          PIPELINE_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          
+          [ -z "$(echo "$COMMIT_MSG" | tr -d '[:space:]')" ] && COMMIT_MSG="$FAIL_DESC_TEXT"
+
+          # EDIT MESSAGE ON FAILURE
+          if [ -n "$MSG_ID" ]; then
+            jq -n \
+              --arg url "$PIPELINE_URL" \
+              --arg footer "Build Failed • $HASH" \
+              --arg timestamp "$TIMESTAMP" \
+              --arg icon "$ICON_URL" \
+              --arg desc "$COMMIT_MSG" \
+              --argjson color "$COLOR_FAIL" \
+              '{ 
+                embeds: [{ 
+                  color: $color, 
+                  author: { name: "Build Failed ❌", icon_url: $icon }, 
+                  title: "Click here to view Pipeline Logs", 
+                  url: $url, 
+                  description: $desc, 
+                  footer: { text: $footer }, 
+                  timestamp: $timestamp 
+                }] 
+              }' > build_fail.json
+          
+            curl -s -X PATCH -H "Content-Type: application/json" -d @build_fail.json "${WEBHOOK_URL}/messages/${MSG_ID}?thread_id=${THREAD_ID}"
+          fi
+
+      # --- STEP 4: SAVE ARTIFACTS TO GITHUB ---
       - name: Upload JAR Artifacts to GitHub
         if: always()
         uses: actions/upload-artifact@v4
