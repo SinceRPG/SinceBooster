@@ -85,13 +85,13 @@ public class ManageShareGUI implements Listener {
             String name = headSec != null ? headSec.getString("name", "&cKick: <player>") : "&cKick: <player>";
             String tooltip = headSec != null ? (headSec.isList("tooltip") ? String.join("<br>", headSec.getStringList("tooltip")) : headSec.getString("tooltip", "&7Click to kick.")) : "&7Click to kick.";
 
-            name = name.replace("<player>", target.getName() != null ? target.getName() : "Unknown");
+            name = name.replace("<player>", getPlayerName(target));
 
             buttons.add(ActionButton.builder(ColorUtils.parse(name))
                     .tooltip(ColorUtils.parse(tooltip))
                     .action(DialogAction.customClick((view, audience) -> {
                         if (audience instanceof Player clicker) {
-                            plugin.getServer().getScheduler().runTask(plugin, () -> {
+                            plugin.getFoliaScheduler().runEntity(clicker, () -> {
                                 plugin.getBoosterManager().getShareManager().kickShare(clicker, boosterId, target);
                                 openDialog(clicker, boosterId);
                             });
@@ -161,7 +161,7 @@ public class ManageShareGUI implements Listener {
     private ItemStack createPlayerHead(OfflinePlayer target) {
         ConfigurationSection headSec = getGui().getConfig().getConfigurationSection("manage_share.items.player_head");
         ItemStack item = new ItemBuilder(plugin, Material.PLAYER_HEAD).applyConfig(headSec, "&cKick: <player>",
-                "<player>", target.getName() != null ? target.getName() : "Unknown"
+                "<player>", getPlayerName(target)
         ).setTag(targetKey, PersistentDataType.STRING, target.getUniqueId().toString()).build();
 
         SkullMeta meta = (SkullMeta) item.getItemMeta();
@@ -170,6 +170,10 @@ public class ManageShareGUI implements Listener {
             item.setItemMeta(meta);
         }
         return item;
+    }
+
+    private String getPlayerName(OfflinePlayer player) {
+        return player.getName() != null ? player.getName() : getGui().getString("booster_list.formats.unknown_player", "Unknown");
     }
 
     @EventHandler

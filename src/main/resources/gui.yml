@@ -26,6 +26,10 @@ booster_list:
 
   formats:
     time_left: "&f<day>d <hour>h <min>m <sec>s"
+    offline_owner_suffix: "(Off)"
+    class_type: "Class XP"
+    profession_type: "Job: <profession>"
+    unknown_player: "Unknown"
 
   # ===================================================
   # INVENTORY SETTINGS

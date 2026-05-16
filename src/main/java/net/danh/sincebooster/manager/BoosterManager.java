@@ -54,6 +54,7 @@ public class BoosterManager {
     }
 
     public void refreshIncomingCache(Booster b) {
+        if (!b.isValid()) return;
         for (UUID receiverId : b.getSharedPlayers()) {
             incomingShares.computeIfAbsent(receiverId, k -> ConcurrentHashMap.newKeySet()).add(b);
         }
@@ -101,7 +102,7 @@ public class BoosterManager {
             else sendMsg(p, "booster.receive.duration", finalId, multiplier, seconds);
         }
 
-        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> plugin.getPlayerDataHandler().saveData(p.getUniqueId(), false));
+        plugin.getPlayerDataHandler().saveData(p.getUniqueId(), false);
     }
 
     public double getTotalMultiplier(Player p, String profession) {
@@ -167,6 +168,31 @@ public class BoosterManager {
 
     public List<Booster> getBoosters(UUID uuid) {
         return activeBoosters.getOrDefault(uuid, Collections.emptyList());
+    }
+
+    public void pruneExpiredBoosters() {
+        for (Map.Entry<UUID, List<Booster>> entry : activeBoosters.entrySet()) {
+            List<Booster> boosters = entry.getValue();
+            if (boosters == null) continue;
+
+            for (Booster booster : new ArrayList<>(boosters)) {
+                if (booster.isValid()) continue;
+                boosters.remove(booster);
+                for (UUID receiverId : booster.getSharedPlayers()) {
+                    removeFromIncomingCache(booster, receiverId);
+                }
+            }
+
+            if (boosters.isEmpty() && Bukkit.getPlayer(entry.getKey()) == null) {
+                activeBoosters.remove(entry.getKey(), boosters);
+            }
+        }
+
+        incomingShares.entrySet().removeIf(entry -> {
+            Set<Booster> boosters = entry.getValue();
+            boosters.removeIf(booster -> !booster.isValid());
+            return boosters.isEmpty();
+        });
     }
 
     public void removeActiveBoosters(UUID uuid) {

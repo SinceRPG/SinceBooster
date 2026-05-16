@@ -20,6 +20,9 @@ gui:
   type: "INVENTORY"
 
 share:
+  # Seconds before a pending share invite expires.
+  invite-expiry-seconds: 60
+
   # Decay rate of time when sharing a Booster with other players.
   # Example: 2.0 means the Booster will expire twice as fast when shared.
   default-rate: 2.0

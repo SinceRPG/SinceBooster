@@ -52,11 +52,15 @@ public class DatabaseManager {
         } else {
             File file = new File(plugin.getDataFolder(), "database.db");
             config.setJdbcUrl("jdbc:sqlite:" + file.getAbsolutePath());
+            config.setMaximumPoolSize(1);
+            config.setMinimumIdle(1);
         }
 
         config.setPoolName("SinceBooster-Pool");
-        config.setMaximumPoolSize(10);
-        config.setMinimumIdle(2);
+        if (isMySQL) {
+            config.setMaximumPoolSize(10);
+            config.setMinimumIdle(2);
+        }
         config.setConnectionTimeout(30000);
         config.setIdleTimeout(600000);
         config.setMaxLifetime(1800000);
@@ -138,7 +142,7 @@ public class DatabaseManager {
                     UUID ownerId = UUID.fromString(rs.getString("uuid"));
 
                     String sharedRaw = rs.getString("shared_with");
-                    if (!Arrays.asList(sharedRaw.split(",")).contains(receiverId.toString())) continue;
+                    if (sharedRaw == null || !Arrays.asList(sharedRaw.split(",")).contains(receiverId.toString())) continue;
 
                     double offlineRate = rs.getDouble("offline_share_rate");
                     Booster b = new Booster(
@@ -149,6 +153,7 @@ public class DatabaseManager {
                             rs.getBoolean("is_permanent"),
                             true, ownerId, offlineRate
                     );
+                    b.addSharedPlayer(receiverId);
 
                     result.computeIfAbsent(ownerId, k -> new ArrayList<>()).add(b);
                 }

@@ -13,6 +13,9 @@ admin:
   remove_success: "&aRemoved Booster &e<id> &afrom player &b<target>&a."
   remove_all_success: "&aRemoved &call &aboosters from player &b<target>&a."
 
+command:
+  players_only: "&cOnly players can use this command."
+
 share:
   invalid_target: "&cInvalid target."
   self_interaction: "&cYou cannot perform this action on yourself."
@@ -38,6 +41,10 @@ share:
   kick_success: "&aStopped sharing &e<booster> &awith &c<target>&a."
   kick_target_notify: "&c<player> &cstopped sharing &e<booster> &cwith you."
   unknown_player: "&cUnknown"
+  unknown_offline_player: "Unknown (Off)"
+  format:
+    permanent: "<id> (Permanent x<mult>)"
+    duration: "<id> (x<mult>, <time>)"
 
   owner_offline: "&cThe owner of this booster is currently offline."
   leave_success: "&aSuccessfully cancelled shared boosters from &b<owner>&a."

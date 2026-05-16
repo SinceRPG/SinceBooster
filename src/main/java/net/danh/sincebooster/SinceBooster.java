@@ -11,6 +11,7 @@ import net.danh.sincebooster.hooks.MMOCoreHook;
 import net.danh.sincebooster.manager.BoosterManager;
 import net.danh.sincebooster.utils.ColorUtils;
 import net.danh.sincebooster.utils.ConfigUtils;
+import net.danh.sincebooster.utils.FoliaScheduler;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -18,7 +19,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.jspecify.annotations.NonNull;
 
 /**
@@ -37,6 +37,7 @@ public final class SinceBooster extends JavaPlugin {
     private PlayerDataHandler playerDataHandler;
     private DatabaseManager databaseManager;
     private BoosterGUI boosterGUI;
+    private FoliaScheduler foliaScheduler;
 
     public static SinceBooster getPlugin() {
         return plugin;
@@ -50,6 +51,7 @@ public final class SinceBooster extends JavaPlugin {
         configFile = new ConfigUtils(this, "config.yml");
         messagesFile = new ConfigUtils(this, "messages.yml");
         guiFile = new ConfigUtils(this, "gui.yml");
+        foliaScheduler = new FoliaScheduler(this);
 
         databaseManager = new DatabaseManager(this);
         playerDataHandler = new PlayerDataHandler(this);
@@ -79,7 +81,7 @@ public final class SinceBooster extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        Bukkit.getScheduler().cancelTasks(this);
+        if (foliaScheduler != null) foliaScheduler.cancelTasks();
         if (playerDataHandler != null) {
             getLogger().info(messagesFile.getString("log.saving_data", "Saving player data..."));
             playerDataHandler.saveAllSync();
@@ -121,12 +123,9 @@ public final class SinceBooster extends JavaPlugin {
     private void startAutoSaveTask() {
         long seconds = configFile.getConfig().getLong("auto-save", 300);
         if (seconds <= 0) return;
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                if (playerDataHandler != null) playerDataHandler.saveAllAsync();
-            }
-        }.runTaskTimerAsynchronously(this, seconds * 20L, seconds * 20L);
+        foliaScheduler.runAsyncTimer(() -> {
+            if (playerDataHandler != null) playerDataHandler.saveAllAsync();
+        }, seconds * 20L, seconds * 20L);
     }
 
     public DatabaseManager getDatabaseManager() {
@@ -159,5 +158,9 @@ public final class SinceBooster extends JavaPlugin {
 
     public BoosterGUI getBoosterGUI() {
         return boosterGUI;
+    }
+
+    public FoliaScheduler getFoliaScheduler() {
+        return foliaScheduler;
     }
 }

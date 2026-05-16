@@ -29,7 +29,6 @@ import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
@@ -61,19 +60,18 @@ public class BoosterGUI implements Listener {
     }
 
     public void startUpdateTask() {
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                if (plugin.getConfigFile().getString("gui.type", "INVENTORY").equalsIgnoreCase("DIALOG")) return;
+        plugin.getFoliaScheduler().runGlobalTimer(() -> {
+            if (plugin.getConfigFile().getString("gui.type", "INVENTORY").equalsIgnoreCase("DIALOG")) return;
 
-                for (Player p : Bukkit.getOnlinePlayers()) {
+            for (Player p : Bukkit.getOnlinePlayers()) {
+                plugin.getFoliaScheduler().runEntity(p, () -> {
                     Inventory topInv = p.getOpenInventory().getTopInventory();
                     if (topInv.getHolder(false) instanceof BoosterHolder holder) {
                         updateContent(topInv, holder.getTargetUUID(), p);
                     }
-                }
+                });
             }
-        }.runTaskTimer(plugin, 20L, 20L);
+        }, 20L, 20L);
     }
 
     public void open(Player p) {
@@ -113,7 +111,7 @@ public class BoosterGUI implements Listener {
                         .tooltip(ColorUtils.parse(tooltip))
                         .action(DialogAction.customClick((view, audience) -> {
                             if (audience instanceof Player p) {
-                                plugin.getServer().getScheduler().runTask(plugin, () -> {
+                                plugin.getFoliaScheduler().runEntity(p, () -> {
                                     if (!p.hasPermission("sincebooster.share")) {
                                         p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.no_permission")));
                                         p.closeDialog();
@@ -142,7 +140,7 @@ public class BoosterGUI implements Listener {
                         .tooltip(ColorUtils.parse(tooltip))
                         .action(DialogAction.customClick((view, audience) -> {
                             if (audience instanceof Player p) {
-                                plugin.getServer().getScheduler().runTask(plugin, () -> {
+                                plugin.getFoliaScheduler().runEntity(p, () -> {
                                     if (!p.hasPermission("sincebooster.share.offline")) {
                                         p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.offline_no_perm")));
                                         return;
@@ -238,7 +236,7 @@ public class BoosterGUI implements Listener {
         String id = b.getId().toUpperCase();
 
         String typeColor = (b.getProfession() == null) ? "<aqua>" : "<green>";
-        String typeName = (b.getProfession() == null) ? "Class XP" : "Job: " + b.getProfession().toUpperCase();
+        String typeName = getBoosterTypeName(b);
 
         String nameFormatKey = b.isPermanent() ? "name_perm" : "name_time";
         String name = sec.getString(nameFormatKey, "&6<id> &7(<time>)").replace("<id>", id).replace("<time>", timeStr);
@@ -264,7 +262,7 @@ public class BoosterGUI implements Listener {
                 StringBuilder sb = new StringBuilder();
                 for (UUID uid : b.getSharedPlayers()) {
                     OfflinePlayer op = Bukkit.getOfflinePlayer(uid);
-                    String pName = (op.getName() != null) ? op.getName() : "Unknown";
+                    String pName = (op.getName() != null) ? op.getName() : getGui().getString("booster_list.formats.unknown_player", "Unknown");
                     String format = getGui().getString("booster_list.items.shared_list_format", "&7- &f<player>");
                     sb.append(format.replace("<player>", pName)).append("<br>");
                 }
@@ -290,7 +288,7 @@ public class BoosterGUI implements Listener {
                     .tooltip(ColorUtils.parse(tooltip))
                     .action(DialogAction.customClick((view, audience) -> {
                         if (audience instanceof Player p) {
-                            plugin.getServer().getScheduler().runTask(plugin, () -> {
+                            plugin.getFoliaScheduler().runEntity(p, () -> {
                                 if (!p.hasPermission("sincebooster.share")) {
                                     p.sendMessage(ColorUtils.parseWithPrefix(getMsg().getString("share.no_permission")));
                                     return;
@@ -322,7 +320,7 @@ public class BoosterGUI implements Listener {
                     .tooltip(ColorUtils.parse(tooltip))
                     .action(DialogAction.customClick((view, audience) -> {
                         if (audience instanceof Player p) {
-                            plugin.getServer().getScheduler().runTask(plugin, () -> {
+                            plugin.getFoliaScheduler().runEntity(p, () -> {
                                 OfflinePlayer owner = Bukkit.getOfflinePlayer(db.ownerUUID);
                                 plugin.getBoosterManager().getShareManager().leaveShare(p, owner);
                                 p.closeDialog();
@@ -357,7 +355,7 @@ public class BoosterGUI implements Listener {
         if (ownList != null) {
             for (Booster b : ownList) {
                 if (b.isValid())
-                    displayList.add(new DisplayBooster(b, true, Bukkit.getOfflinePlayer(targetUUID).getName(), targetUUID));
+                    displayList.add(new DisplayBooster(b, true, getOfflineName(targetUUID), targetUUID, targetUUID));
             }
         }
 
@@ -371,7 +369,7 @@ public class BoosterGUI implements Listener {
                     if (b.isValid() && b.getSharedPlayers().contains(targetUUID)) {
                         Player onlineOwner = Bukkit.getPlayer(ownerUUID);
                         String ownerName = (onlineOwner != null) ? onlineOwner.getName() : getOfflineName(ownerUUID);
-                        displayList.add(new DisplayBooster(b, false, ownerName, ownerUUID));
+                        displayList.add(new DisplayBooster(b, false, ownerName, ownerUUID, targetUUID));
                     }
                 }
             }
@@ -384,11 +382,11 @@ public class BoosterGUI implements Listener {
                 if (Bukkit.getPlayer(ownerUUID) != null) continue;
 
                 List<Booster> boosters = entry.getValue();
-                String ownerName = getOfflineName(ownerUUID) + " (Off)";
+                String ownerName = getOfflineName(ownerUUID) + " " + getGui().getString("booster_list.formats.offline_owner_suffix", "(Off)");
 
                 for (Booster b : boosters) {
                     if (b.isValid() && b.getSharedPlayers().contains(targetUUID)) {
-                        displayList.add(new DisplayBooster(b, false, ownerName, ownerUUID));
+                        displayList.add(new DisplayBooster(b, false, ownerName, ownerUUID, targetUUID));
                     }
                 }
             }
@@ -510,7 +508,7 @@ public class BoosterGUI implements Listener {
         String id = b.getId().toUpperCase();
 
         String typeColor = (b.getProfession() == null) ? "<aqua>" : "<green>";
-        String typeName = (b.getProfession() == null) ? "Class XP" : "Job: " + b.getProfession().toUpperCase();
+        String typeName = getBoosterTypeName(b);
         String statusPath = b.isPermanent() ? "booster_list.items.status_perm" : "booster_list.items.status_time";
         String status = getGui().getString(statusPath).replace("<time_left>", timeStr);
 
@@ -538,7 +536,7 @@ public class BoosterGUI implements Listener {
                     StringBuilder sb = new StringBuilder();
                     for (UUID uid : b.getSharedPlayers()) {
                         OfflinePlayer op = Bukkit.getOfflinePlayer(uid);
-                        String pName = (op.getName() != null) ? op.getName() : "Unknown";
+                        String pName = (op.getName() != null) ? op.getName() : getGui().getString("booster_list.formats.unknown_player", "Unknown");
                         String format = getGui().getString("booster_list.items.shared_list_format", "&7- &f<player>");
                         sb.append(format.replace("<player>", pName)).append("<br>");
                     }
@@ -640,12 +638,15 @@ public class BoosterGUI implements Listener {
     }
 
     private double displayBoosterBonus(DisplayBooster db) {
-        double bonus = db.booster.getMultiplier() - 1.0;
-        if (db.booster.isPermanent() && !db.booster.getSharedPlayers().isEmpty()) {
-            double rate = db.isOwner ? plugin.getBoosterManager().getShareManager().getOwnerBuffRate(db.ownerUUID) : plugin.getBoosterManager().getShareManager().getReceiverBuffRate(db.ownerUUID);
-            bonus *= rate;
+        return plugin.getBoosterManager().getShareManager().getFinalMultiplier(db.booster, db.subjectUUID) - 1.0;
+    }
+
+    private String getBoosterTypeName(Booster booster) {
+        if (booster.getProfession() == null) {
+            return getGui().getString("booster_list.formats.class_type", "Class XP");
         }
-        return bonus;
+        return getGui().getString("booster_list.formats.profession_type", "Job: <profession>")
+                .replace("<profession>", booster.getProfession().toUpperCase());
     }
 
     private String formatTime(long seconds) {
@@ -676,6 +677,7 @@ public class BoosterGUI implements Listener {
     @EventHandler
     public void onClick(InventoryClickEvent e) {
         if (!(e.getInventory().getHolder(false) instanceof BoosterHolder holder)) return;
+        if (!(e.getWhoClicked() instanceof Player p)) return;
 
         e.setCancelled(true);
         UUID targetUUID = holder.getTargetUUID();
@@ -684,7 +686,6 @@ public class BoosterGUI implements Listener {
             int slot = e.getSlot();
             int shareSlot = getGui().getInt("booster_list.items.share_button.slot");
             int toggleSlot = getGui().getInt("booster_list.items.offline_toggle_button.slot");
-            Player p = (Player) e.getWhoClicked();
             boolean isSelfView = targetUUID.equals(p.getUniqueId());
 
             if (slot == shareSlot) {
@@ -765,12 +766,14 @@ public class BoosterGUI implements Listener {
         boolean isOwner;
         String ownerName;
         UUID ownerUUID;
+        UUID subjectUUID;
 
-        public DisplayBooster(Booster b, boolean o, String n, UUID u) {
+        public DisplayBooster(Booster b, boolean o, String n, UUID u, UUID subjectUUID) {
             booster = b;
             isOwner = o;
             ownerName = n;
             ownerUUID = u;
+            this.subjectUUID = subjectUUID;
         }
     }
 

@@ -35,9 +35,10 @@ public class JoinQuit implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent e) {
         UUID quitUUID = e.getPlayer().getUniqueId();
-        plugin.getPlayerDataHandler().saveData(quitUUID, true);
+        plugin.getBoosterManager().getShareManager().updateOfflineSharesOnQuit(e.getPlayer());
+        plugin.getPlayerDataHandler().saveData(e.getPlayer(), true);
 
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+        plugin.getFoliaScheduler().runGlobalLater(() -> {
             plugin.getBoosterManager().getActiveBoosters().keySet().removeIf(ownerId -> {
                 if (Bukkit.getPlayer(ownerId) != null) return false;
 

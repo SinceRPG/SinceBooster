@@ -110,16 +110,13 @@ public class Booster {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Booster booster = (Booster) o;
-        return Double.compare(booster.multiplier, multiplier) == 0 &&
-                permanent == booster.permanent &&
-                endTime == booster.endTime &&
-                Objects.equals(id, booster.id) &&
+        return Objects.equals(id, booster.id) &&
                 Objects.equals(profession, booster.profession) &&
                 Objects.equals(ownerUUID, booster.ownerUUID);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, multiplier, profession, permanent, endTime, ownerUUID);
+        return Objects.hash(id, profession, ownerUUID);
     }
 }

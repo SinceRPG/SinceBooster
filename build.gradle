@@ -24,6 +24,7 @@ dependencies {
     compileOnly("io.lumine:MythicLib-dist:1.7.1-SNAPSHOT")
     compileOnly("net.Indyuce:MMOCore-API:1.13.1-SNAPSHOT")
     implementation("com.zaxxer:HikariCP:7.0.2")
+    implementation("org.xerial:sqlite-jdbc:3.51.1.0")
 }
 
 tasks {
@@ -57,7 +58,6 @@ tasks.withType(JavaCompile).configureEach {
 shadowJar {
     relocate 'com.zaxxer.hikari', 'net.danh.sincebooster.libs.hikari'
 
-    // Tên file jar xuất ra (tùy chọn)
     archiveClassifier.set('')
 }
 

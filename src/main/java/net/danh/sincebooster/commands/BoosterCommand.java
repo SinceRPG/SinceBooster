@@ -20,7 +20,6 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -158,8 +157,10 @@ public class BoosterCommand {
                     .then(Commands.literal("share")
                             .then(Commands.literal("offline")
                                     .executes(ctx -> {
-                                        Player p = (Player) ctx.getSource().getExecutor();
-                                        if (p == null) return 0;
+                                        if (!(ctx.getSource().getExecutor() instanceof Player p)) {
+                                            ctx.getSource().getSender().sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("command.players_only", "&cOnly players can use this command.")));
+                                            return 0;
+                                        }
 
                                         if (!(p.hasPermission("sincebooster.share.offline") && p.hasPermission("sincebooster.share"))) {
                                             p.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.offline_no_perm", "No permission for offline share.")));
@@ -184,14 +185,17 @@ public class BoosterCommand {
                             .then(Commands.argument("target", StringArgumentType.word())
                                     .suggests((ctx, builder) -> suggestPlayers(builder))
                                     .then(Commands.literal("all").executes(ctx -> {
-                                        Player p = (Player) ctx.getSource().getExecutor();
+                                        if (!(ctx.getSource().getExecutor() instanceof Player p)) {
+                                            ctx.getSource().getSender().sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("command.players_only", "&cOnly players can use this command.")));
+                                            return 0;
+                                        }
                                         Player t = Bukkit.getPlayer(StringArgumentType.getString(ctx, "target"));
-                                        if (p != null && !p.hasPermission("sincebooster.share")) {
+                                        if (!p.hasPermission("sincebooster.share")) {
                                             p.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.no_permission", "No share permission.")));
                                             return 0;
                                         }
                                         if (validateShare(p, t)) {
-                                            List<Booster> list = plugin.getBoosterManager().getActiveBoosters(Objects.requireNonNull(p).getUniqueId());
+                                            List<Booster> list = plugin.getBoosterManager().getActiveBoosters(p.getUniqueId());
                                             plugin.getBoosterManager().getShareManager().sendInviteBatch(p, t, list);
                                         }
                                         return 1;
@@ -205,15 +209,18 @@ public class BoosterCommand {
                                                 return builder.buildFuture();
                                             })
                                             .executes(ctx -> {
-                                                Player p = (Player) ctx.getSource().getExecutor();
+                                                if (!(ctx.getSource().getExecutor() instanceof Player p)) {
+                                                    ctx.getSource().getSender().sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("command.players_only", "&cOnly players can use this command.")));
+                                                    return 0;
+                                                }
                                                 Player t = Bukkit.getPlayer(StringArgumentType.getString(ctx, "target"));
                                                 String bId = StringArgumentType.getString(ctx, "booster_id");
-                                                if (p != null && !p.hasPermission("sincebooster.share")) {
+                                                if (!p.hasPermission("sincebooster.share")) {
                                                     p.sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("share.no_permission", "No share permission.")));
                                                     return 0;
                                                 }
                                                 if (validateShare(p, t)) {
-                                                    plugin.getBoosterManager().getShareManager().sendInvite(Objects.requireNonNull(p), t, bId);
+                                                    plugin.getBoosterManager().getShareManager().sendInvite(p, t, bId);
                                                 }
                                                 return 1;
                                             })
@@ -230,9 +237,12 @@ public class BoosterCommand {
                                         return builder.buildFuture();
                                     })
                                     .executes(ctx -> {
-                                        Player p = (Player) ctx.getSource().getExecutor();
+                                        if (!(ctx.getSource().getExecutor() instanceof Player p)) {
+                                            ctx.getSource().getSender().sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("command.players_only", "&cOnly players can use this command.")));
+                                            return 0;
+                                        }
                                         Player s = Bukkit.getPlayer(StringArgumentType.getString(ctx, "sender"));
-                                        if (s != null && p != null)
+                                        if (s != null)
                                             plugin.getBoosterManager().getShareManager().acceptInvite(p, s);
                                         return 1;
                                     })
@@ -248,9 +258,12 @@ public class BoosterCommand {
                                         return builder.buildFuture();
                                     })
                                     .executes(ctx -> {
-                                        Player p = (Player) ctx.getSource().getExecutor();
+                                        if (!(ctx.getSource().getExecutor() instanceof Player p)) {
+                                            ctx.getSource().getSender().sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("command.players_only", "&cOnly players can use this command.")));
+                                            return 0;
+                                        }
                                         Player owner = Bukkit.getPlayer(StringArgumentType.getString(ctx, "owner"));
-                                        if (owner != null && p != null)
+                                        if (owner != null)
                                             plugin.getBoosterManager().getShareManager().leaveShare(p, owner);
                                         return 1;
                                     })
@@ -286,10 +299,13 @@ public class BoosterCommand {
                                                 return builder.buildFuture();
                                             })
                                             .executes(ctx -> {
-                                                Player p = (Player) ctx.getSource().getExecutor();
+                                                if (!(ctx.getSource().getExecutor() instanceof Player p)) {
+                                                    ctx.getSource().getSender().sendMessage(ColorUtils.parseWithPrefix(plugin.getMessagesFile().getString("command.players_only", "&cOnly players can use this command.")));
+                                                    return 0;
+                                                }
                                                 String bId = StringArgumentType.getString(ctx, "booster_id");
                                                 Player t = Bukkit.getPlayer(StringArgumentType.getString(ctx, "target"));
-                                                if (t != null && p != null)
+                                                if (t != null)
                                                     plugin.getBoosterManager().getShareManager().kickShare(p, bId, t);
                                                 return 1;
                                             })

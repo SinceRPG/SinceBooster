@@ -2,6 +2,7 @@ name: SinceBooster
 version: '${version}'
 main: net.danh.sincebooster.SinceBooster
 api-version: '1.21'
+folia-supported: true
 authors: [ VoChiDanh ]
 website: https://gitlab.com/sincerpg/SinceBooster
 dependencies:

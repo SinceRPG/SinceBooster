@@ -84,7 +84,7 @@ public class ShareGUI implements Listener {
                     .tooltip(ColorUtils.parse(tooltip))
                     .action(DialogAction.customClick((view, audience) -> {
                         if (audience instanceof Player clicker) {
-                            plugin.getServer().getScheduler().runTask(plugin, () -> {
+                            plugin.getFoliaScheduler().runEntity(clicker, () -> {
                                 if (target.isOnline()) {
                                     openBoosterSelector(clicker, target);
                                 } else {
@@ -181,7 +181,7 @@ public class ShareGUI implements Listener {
                 String id = b.getId().toUpperCase();
 
                 String typeColor = (b.getProfession() == null) ? "<aqua>" : "<green>";
-                String typeName = (b.getProfession() == null) ? "Class XP" : "Job: " + b.getProfession().toUpperCase();
+                String typeName = getBoosterTypeName(b);
 
                 double baseMult = b.getMultiplier();
                 double receiverRateConfig = plugin.getPlayerDataHandler().getSession(p.getUniqueId()).getReceiverBuffRate();
@@ -219,7 +219,7 @@ public class ShareGUI implements Listener {
                         .tooltip(ColorUtils.parse(tooltip))
                         .action(DialogAction.customClick((view, audience) -> {
                             if (audience instanceof Player clicker) {
-                                plugin.getServer().getScheduler().runTask(plugin, () -> {
+                                plugin.getFoliaScheduler().runEntity(clicker, () -> {
                                     if (target != null && target.isOnline()) {
                                         plugin.getBoosterManager().getShareManager().sendInvite(clicker, target, b.getId());
                                     } else {
@@ -292,7 +292,7 @@ public class ShareGUI implements Listener {
         String id = b.getId().toUpperCase();
 
         String typeColor = (b.getProfession() == null) ? "<aqua>" : "<green>";
-        String typeName = (b.getProfession() == null) ? "Class XP" : "Job: " + b.getProfession().toUpperCase();
+        String typeName = getBoosterTypeName(b);
 
         double baseMult = b.getMultiplier();
         double receiverRateConfig = plugin.getPlayerDataHandler().getSession(p.getUniqueId()).getReceiverBuffRate();
@@ -394,6 +394,14 @@ public class ShareGUI implements Listener {
     private String formatTime(long seconds) {
         long d = seconds / 86400, h = (seconds % 86400) / 3600, m = (seconds % 3600) / 60, s = seconds % 60;
         return getGui().getString("booster_list.formats.time_left").replace("<day>", String.valueOf(d)).replace("<hour>", String.valueOf(h)).replace("<min>", String.valueOf(m)).replace("<sec>", String.valueOf(s));
+    }
+
+    private String getBoosterTypeName(Booster booster) {
+        if (booster.getProfession() == null) {
+            return getGui().getString("booster_list.formats.class_type", "Class XP");
+        }
+        return getGui().getString("booster_list.formats.profession_type", "Job: <profession>")
+                .replace("<profession>", booster.getProfession().toUpperCase());
     }
 
     public static class PlayerSelectorHolder implements InventoryHolder {

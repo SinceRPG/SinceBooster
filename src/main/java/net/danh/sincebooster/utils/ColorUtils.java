@@ -17,7 +17,12 @@ public class ColorUtils {
 
     public static @NotNull Component parse(@NotNull String input) {
         if (input.isEmpty()) return Component.empty();
-        return MINI_MESSAGE.deserialize(convertLegacyToMiniMessage(input));
+        String converted = convertLegacyToMiniMessage(input);
+        try {
+            return MINI_MESSAGE.deserialize(converted);
+        } catch (RuntimeException ignored) {
+            return Component.text(input);
+        }
     }
 
     public static @NotNull Component parseWithPrefix(@NotNull String input) {

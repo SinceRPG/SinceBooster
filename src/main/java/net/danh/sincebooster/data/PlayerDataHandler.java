@@ -32,9 +32,9 @@ public class PlayerDataHandler {
      */
     public void loadData(@NotNull Player p) {
         UUID uuid = p.getUniqueId();
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        plugin.getFoliaScheduler().runAsync(() -> {
             PlayerSession session = loadSessionFromDatabase(uuid);
-            Bukkit.getScheduler().runTask(plugin, () -> {
+            plugin.getFoliaScheduler().runEntity(p, () -> {
                 if (p.isOnline()) {
                     sessionMap.put(uuid, session);
                     plugin.getBoosterManager().loadPlayerBoosters(uuid, session.getBoosters());
@@ -124,13 +124,6 @@ public class PlayerDataHandler {
         if (!sessionMap.containsKey(uuid)) return;
         PlayerSession session = sessionMap.get(uuid);
 
-        Player p = Bukkit.getPlayer(uuid);
-        if (p != null) {
-            if (!p.hasPermission("sincebooster.share.offline")) {
-                session.setOfflineShareEnabled(false);
-            }
-        }
-
         List<Booster> saveBoosters = new ArrayList<>(plugin.getBoosterManager().getBoosters(uuid));
 
         if (removeDataFromMemory) {
@@ -138,7 +131,15 @@ public class PlayerDataHandler {
             plugin.getBoosterManager().unloadPlayerBoosters(uuid);
         }
 
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> saveSessionToDatabase(uuid, session, saveBoosters));
+        plugin.getFoliaScheduler().runAsync(() -> saveSessionToDatabase(uuid, session, saveBoosters));
+    }
+
+    public void saveData(Player player, boolean removeDataFromMemory) {
+        PlayerSession session = sessionMap.get(player.getUniqueId());
+        if (session != null && !player.hasPermission("sincebooster.share.offline")) {
+            session.setOfflineShareEnabled(false);
+        }
+        saveData(player.getUniqueId(), removeDataFromMemory);
     }
 
     private void saveSessionToDatabase(UUID uuid, PlayerSession session, List<Booster> boosters) {
