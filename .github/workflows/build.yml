@@ -1,0 +1,159 @@
+# FILE PATH: .github/workflows/build.yml
+name: SinceBooster CI/CD
+
+# Trigger the workflow on push to any branch
+on:
+  push:
+    branches:
+      - '**'
+
+# Define all global environment variables (Removed hardcoded values from scripts)
+env:
+  # Webhook URLs and Thread IDs
+  DISCORD_WEBHOOK_URL: "https://discord.com/api/webhooks/1471469221614583810/pfMtLyRbTDKiUGMJyVBjhhJ3RDgQelOX71iMGqWg3HdrlokqBJSt1Ox3aC4yTkkGtZ-_?thread_id=1471468999282786397"
+
+  # Gradle Settings
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+
+  # Bot Identity & Assets
+  ICON_URL: "https://gitlab.com/uploads/-/system/group/avatar/121690756/SinceRPG.png?width=48"
+  THUMBNAIL_URL: "https://gitlab.com/uploads/-/system/group/avatar/121690756/SinceRPG.png?width=48"
+  BOT_USERNAME: "SinceBooster Build"
+
+  # Embed Colors (Decimal format)
+  COLOR_SUCCESS: "5763719" # Green
+  COLOR_FAIL: "15548997"   # Red
+
+jobs:
+  build_and_notify:
+    name: Build & Discord Notify
+    runs-on: ubuntu-latest
+
+    steps:
+      # --- PREPARE ENVIRONMENT ---
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required to fetch git log history for commits
+
+      - name: Setup Java JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle' # Automatically handles Gradle caching
+
+      # --- ACTUAL BUILD PROCESS ---
+      - name: Build with Gradle
+        run: |
+          # Use Gradle Wrapper if available, otherwise fallback to system Gradle
+          if [ -f "./gradlew" ]; then
+             chmod +x ./gradlew
+             ./gradlew clean build
+          else
+             gradle clean build
+          fi
+
+      # --- NOTIFY SUCCESS ---
+      # Runs only if the 'Build with Gradle' step passes without errors
+      - name: Notify Success & Upload JAR to Discord
+        if: success()
+        run: |
+          # 1. EXTRACT COMMIT AND GRADLE INFORMATION
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          AUTHOR=$(git log -1 --pretty=%an)
+          HASH=$(git log -1 --pretty=%h)
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          if [ -f "./gradlew" ]; then GRADLE_CMD="./gradlew"; else GRADLE_CMD="gradle"; fi
+          VERSION=$($GRADLE_CMD properties -q | grep "^version:" | awk '{print $2}' || echo "Unknown")
+          NAME=$($GRADLE_CMD properties -q | grep "^name:" | awk '{print $2}' || echo "Plugin")
+
+          # 2. GENERATE JSON EMBED PAYLOAD (SUCCESS)
+          jq -n \
+            --arg author "$AUTHOR pushed an update for $NAME" \
+            --arg desc "$COMMIT_MSG" \
+            --arg footer "Build Success • Version $VERSION • $HASH" \
+            --arg timestamp "$TIMESTAMP" \
+            --arg icon "$ICON_URL" \
+            --arg thumb "$THUMBNAIL_URL" \
+            --arg bot_name "$BOT_USERNAME" \
+            --argjson color "$COLOR_SUCCESS" \
+            '{
+              username: $bot_name,
+              avatar_url: $icon,
+              embeds: [{
+                color: $color,
+                author: { name: $author, icon_url: $icon },
+                title: "Build Successful & Ready!",
+                description: $desc,
+                thumbnail: { url: $thumb },
+                footer: { text: $footer },
+                timestamp: $timestamp
+              }]
+            }' > success_payload.json
+
+          # 3. SEND EMBED MESSAGE
+          curl -s -H "Content-Type: application/json" -d @success_payload.json "$DISCORD_WEBHOOK_URL"
+          
+          # 4. UPLOAD JAR FILE
+          JAR_FILE=$(find build/libs -maxdepth 1 -name "*.jar" ! -name "*-sources.jar" ! -name "*-javadoc.jar" | head -n 1)
+          if [ -n "$JAR_FILE" ] && [ -f "$JAR_FILE" ]; then
+            echo "Uploading $JAR_FILE..."
+            curl -s -X POST -F "file=@$JAR_FILE" "$DISCORD_WEBHOOK_URL"
+          else
+            echo "Jar file not found in build/libs/!"
+          fi
+
+      # --- NOTIFY FAILURE ---
+      # Runs only if any previous step fails (e.g., compilation error)
+      - name: Notify Failure to Discord
+        if: failure()
+        run: |
+          # 1. EXTRACT COMMIT AND GRADLE INFORMATION
+          AUTHOR=$(git log -1 --pretty=%an)
+          HASH=$(git log -1 --pretty=%h)
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          
+          # GitHub Actions equivalent of CI_PROJECT_URL/-/jobs/CI_JOB_ID
+          JOB_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          if [ -f "./gradlew" ]; then GRADLE_CMD="./gradlew"; else GRADLE_CMD="gradle"; fi
+          NAME=$($GRADLE_CMD properties -q | grep "^name:" | awk '{print $2}' || echo "Plugin")
+
+          # 2. GENERATE JSON EMBED PAYLOAD (FAILURE)
+          jq -n \
+            --arg author "$AUTHOR broke the build for $NAME!" \
+            --arg desc "The build failed. Please check the console logs." \
+            --arg url "$JOB_URL" \
+            --arg footer "Build Failed • $HASH" \
+            --arg timestamp "$TIMESTAMP" \
+            --arg icon "$ICON_URL" \
+            --arg bot_name "$BOT_USERNAME" \
+            --argjson color "$COLOR_FAIL" \
+            '{
+              username: $bot_name,
+              avatar_url: $icon,
+              embeds: [{
+                color: $color,
+                author: { name: $author, icon_url: $icon },
+                title: "Build Failed ❌",
+                url: $url,
+                description: $desc,
+                footer: { text: $footer },
+                timestamp: $timestamp
+              }]
+            }' > fail_payload.json
+
+          # 3. SEND FAILURE ALERT
+          curl -s -H "Content-Type: application/json" -d @fail_payload.json "$DISCORD_WEBHOOK_URL"
+
+      # --- UPLOAD ARTIFACTS TO GITHUB ---
+      # Keeps the JAR available for manual download inside the GitHub Actions UI
+      - name: Upload JAR Artifacts to GitHub
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SinceBooster-Build
+          path: build/libs/*.jar
+          retention-days: 7
