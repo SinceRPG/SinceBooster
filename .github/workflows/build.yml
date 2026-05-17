@@ -10,8 +10,8 @@ on:
 # Define all global environment variables
 env:
   # Base Webhook URL (NO ?thread_id AT THE END)
-  WEBHOOK_URL: "https://discord.com/api/webhooks/1471469221614583810/pfMtLyRbTDKiUGMJyVBjhhJ3RDgQelOX71iMGqWg3HdrlokqBJSt1Ox3aC4yTkkGtZ-_"
-  THREAD_ID: "1471468999282786397"
+  WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+  THREAD_ID: ${{ secrets.DISCORD_WEBHOOK_THREAD_ID }}
 
   # Gradle Settings
   GRADLE_OPTS: "-Dorg.gradle.daemon=false"
