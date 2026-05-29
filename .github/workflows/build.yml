@@ -6,6 +6,10 @@ on:
   push:
     branches:
       - '**'
+  pull_request:
+    branches:
+      - '**'
+  workflow_dispatch:
 
 # Define all global environment variables
 env:
@@ -42,15 +46,16 @@ jobs:
         with:
           fetch-depth: 0 # Required to fetch git log history for commits
 
-      - name: Setup Java JDK 21
+      - name: Setup Java JDK 25
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '25'
           cache: 'gradle' # Automatically handles Gradle caching
 
       # --- STEP 1: NOTIFY BUILD START ---
       - name: Notify Start to Discord
+        if: env.WEBHOOK_URL != ''
         id: notify_start
         run: |
           COMMIT_MSG=$(git log -1 --pretty=%B)
@@ -68,7 +73,7 @@ jobs:
           jq -n \
             --arg author "$AUTHOR triggered a build for SinceBooster" \
             --arg desc "$COMMIT_MSG" \
-            --arg footer "Version $VERSION • $HASH" \
+            --arg footer "Version $VERSION - $HASH" \
             --arg timestamp "$TIMESTAMP" \
             --arg icon "$ICON_URL" \
             --arg thumb "$THUMBNAIL_URL" \
@@ -80,7 +85,7 @@ jobs:
               embeds: [{
                 color: $color,
                 author: { name: $author, icon_url: $icon },
-                title: "⏳ Building...",
+                title: "Building...",
                 description: $desc,
                 thumbnail: { url: $thumb },
                 footer: { text: $footer },
@@ -105,7 +110,7 @@ jobs:
 
       # --- STEP 3A: NOTIFY BUILD SUCCESS ---
       - name: Notify Success & Upload JAR to Discord
-        if: success()
+        if: success() && env.WEBHOOK_URL != ''
         run: |
           COMMIT_MSG=$(git log -1 --pretty=%B)
           AUTHOR=$(git log -1 --pretty=%an)
@@ -122,7 +127,7 @@ jobs:
             jq -n \
               --arg author "$AUTHOR pushed an update for SinceBooster" \
               --arg desc "$COMMIT_MSG" \
-              --arg footer "Version $VERSION • $HASH" \
+              --arg footer "Version $VERSION - $HASH" \
               --arg timestamp "$TIMESTAMP" \
               --arg icon "$ICON_URL" \
               --arg thumb "$THUMBNAIL_URL" \
@@ -131,7 +136,7 @@ jobs:
                 embeds: [{
                   color: $color,
                   author: { name: $author, icon_url: $icon },
-                  title: "Build Successful! 🚀",
+                  title: "Build Successful",
                   description: $desc,
                   thumbnail: { url: $thumb },
                   footer: { text: $footer },
@@ -141,7 +146,11 @@ jobs:
 
             JAR_FILE=$(find build/libs -maxdepth 1 -name "*.jar" ! -name "*-sources.jar" ! -name "*-javadoc.jar" | head -n 1)
             if [ -n "$JAR_FILE" ] && [ -f "$JAR_FILE" ]; then
-              curl -s -X PATCH -F "payload_json=<build_success.json;type=application/json" -F "file=@$JAR_FILE" "${WEBHOOK_URL}/messages/${MSG_ID}?thread_id=${THREAD_ID}"
+              COMMIT_COUNT=$(git rev-list --count HEAD)
+              mkdir -p discord_upload
+              RENAMED_JAR="discord_upload/SinceBooster-build-${COMMIT_COUNT}.jar"
+              cp "$JAR_FILE" "$RENAMED_JAR"
+              curl -s -X PATCH -F "payload_json=<build_success.json;type=application/json" -F "file=@$RENAMED_JAR" "${WEBHOOK_URL}/messages/${MSG_ID}?thread_id=${THREAD_ID}"
             else
               curl -s -X PATCH -H "Content-Type: application/json" -d @build_success.json "${WEBHOOK_URL}/messages/${MSG_ID}?thread_id=${THREAD_ID}"
             fi
@@ -149,7 +158,7 @@ jobs:
 
       # --- STEP 3B: NOTIFY BUILD FAILURE ---
       - name: Notify Failure to Discord
-        if: failure()
+        if: failure() && env.WEBHOOK_URL != ''
         run: |
           COMMIT_MSG=$(git log -1 --pretty=%B)
           HASH=$(git log -1 --pretty=%h)
@@ -163,7 +172,7 @@ jobs:
           if [ -n "$MSG_ID" ]; then
             jq -n \
               --arg url "$PIPELINE_URL" \
-              --arg footer "Build Failed • $HASH" \
+              --arg footer "Build Failed - $HASH" \
               --arg timestamp "$TIMESTAMP" \
               --arg icon "$ICON_URL" \
               --arg desc "$COMMIT_MSG" \
@@ -171,7 +180,7 @@ jobs:
               '{ 
                 embeds: [{ 
                   color: $color, 
-                  author: { name: "Build Failed ❌", icon_url: $icon }, 
+                  author: { name: "Build Failed", icon_url: $icon }, 
                   title: "Click here to view Pipeline Logs", 
                   url: $url, 
                   description: $desc, 
