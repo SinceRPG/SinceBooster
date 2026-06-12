@@ -76,6 +76,7 @@ public class BoosterManager {
         boolean extended = false;
 
         for (Booster b : list) {
+            if (b.isStatBooster()) continue;
             if (b.getId().equalsIgnoreCase(finalId)) {
                 String bProf = (b.getProfession() == null) ? "CLASS" : b.getProfession().toLowerCase();
                 String targetProf = (finalProf == null) ? "CLASS" : finalProf;
@@ -105,6 +106,41 @@ public class BoosterManager {
         plugin.getPlayerDataHandler().saveData(p.getUniqueId(), false);
     }
 
+    public void giveStatBooster(Player p, String boosterId, String stat, double amount, long seconds, boolean isPermanent) {
+        UUID uuid = p.getUniqueId();
+        activeBoosters.putIfAbsent(uuid, new CopyOnWriteArrayList<>());
+        List<Booster> list = activeBoosters.get(uuid);
+
+        String finalId = boosterId.toLowerCase();
+        String finalStat = stat.trim().toUpperCase();
+        boolean extended = false;
+
+        for (Booster b : list) {
+            if (!b.isStatBooster()) continue;
+            if (b.getId().equalsIgnoreCase(finalId) && b.getStat().equalsIgnoreCase(finalStat)) {
+                if (b.isPermanent() && isPermanent) {
+                    list.remove(b);
+                    break;
+                }
+                if (!b.isPermanent() && !isPermanent) {
+                    b.addTime(seconds);
+                    sendMsg(p, "booster.receive.extend", finalId, 0, seconds);
+                    extended = true;
+                    break;
+                }
+            }
+        }
+
+        if (!extended) {
+            Booster newBooster = new Booster(finalId, amount, seconds, finalStat, isPermanent, uuid, true);
+            list.add(newBooster);
+            if (isPermanent) sendMsg(p, "booster.receive.stat_permanent", finalId, amount, 0);
+            else sendMsg(p, "booster.receive.stat_duration", finalId, amount, seconds);
+        }
+
+        plugin.getPlayerDataHandler().saveData(p.getUniqueId(), false);
+    }
+
     public double getTotalMultiplier(Player p, String profession) {
         double totalAdded = 0.0;
         String targetProf = (profession == null) ? null : profession.toLowerCase();
@@ -113,7 +149,7 @@ public class BoosterManager {
         List<Booster> myList = activeBoosters.get(myUUID);
         if (myList != null) {
             for (Booster b : myList) {
-                if (!b.isValid()) continue;
+                if (!b.isValid() || b.isStatBooster()) continue;
                 if (checkProf(b, targetProf)) {
                     double finalMult = shareManager.getFinalMultiplier(b, myUUID);
                     totalAdded += (finalMult - 1.0);
@@ -124,7 +160,7 @@ public class BoosterManager {
         Set<Booster> sharedWithMe = incomingShares.get(myUUID);
         if (sharedWithMe != null) {
             for (Booster b : sharedWithMe) {
-                if (!b.isValid()) continue;
+                if (!b.isValid() || b.isStatBooster()) continue;
                 if (!b.getSharedPlayers().contains(myUUID)) continue;
 
                 if (checkProf(b, targetProf)) {
@@ -148,8 +184,27 @@ public class BoosterManager {
     }
 
     private boolean checkProf(Booster b, String targetProf) {
+        if (b.isStatBooster()) return false;
         if (targetProf == null) return b.getProfession() == null;
         return b.getProfession() != null && b.getProfession().equalsIgnoreCase(targetProf);
+    }
+
+    public double getEffectiveStatAmount(Booster booster, UUID receiverUUID) {
+        if (!booster.isStatBooster()) return 0.0;
+
+        if (booster.getOwnerUUID().equals(receiverUUID)) {
+            double amount = booster.getMultiplier();
+            if (!booster.getSharedPlayers().isEmpty()) {
+                amount *= shareManager.getOwnerBuffRate(receiverUUID);
+            }
+            return amount;
+        }
+
+        if (booster.getSharedPlayers().contains(receiverUUID)) {
+            return booster.getMultiplier() * shareManager.getReceiverMultiplier(booster, receiverUUID);
+        }
+
+        return 0.0;
     }
 
     private void sendMsg(Player p, String path, String id, double mult, long sec) {
@@ -157,6 +212,7 @@ public class BoosterManager {
         if (msg != null) {
             msg = msg.replace("<id>", id.toUpperCase())
                     .replace("<multiplier>", String.valueOf(mult))
+                    .replace("<amount>", String.valueOf(mult))
                     .replace("<time>", String.valueOf(sec));
             p.sendMessage(ColorUtils.parseWithPrefix(msg));
         }

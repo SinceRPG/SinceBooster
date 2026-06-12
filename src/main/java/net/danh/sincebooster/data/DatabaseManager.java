@@ -108,12 +108,14 @@ public class DatabaseManager {
                         booster_id VARCHAR(64) NOT NULL,
                         multiplier DOUBLE NOT NULL,
                         profession VARCHAR(64),
+                        stat VARCHAR(64),
                         is_permanent BOOLEAN NOT NULL,
                         remaining_time BIGINT NOT NULL,
                         shared_with TEXT
                     );
                     """.formatted(boostersTable, autoInc);
             stmt.execute(sqlBoosters);
+            ensureColumn(conn, boostersTable, "stat", "VARCHAR(64)");
 
             try {
                 stmt.execute("CREATE INDEX IF NOT EXISTS idx_booster_uuid ON " + boostersTable + " (uuid);");
@@ -123,6 +125,28 @@ public class DatabaseManager {
         } catch (SQLException e) {
             plugin.getLogger().severe(plugin.getMessagesFile().getString("log.db_create_fail", "Could not create database tables!"));
             e.printStackTrace();
+        }
+    }
+
+    private void ensureColumn(Connection conn, String table, String column, String definition) {
+        try {
+            if (isMySQL) {
+                try (ResultSet rs = conn.getMetaData().getColumns(null, null, table, column)) {
+                    if (rs.next()) return;
+                }
+            } else {
+                try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery("PRAGMA table_info(" + table + ")")) {
+                    while (rs.next()) {
+                        if (column.equalsIgnoreCase(rs.getString("name"))) return;
+                    }
+                }
+            }
+
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().warning("Could not add missing column " + column + " to " + table + ": " + e.getMessage());
         }
     }
 
@@ -150,6 +174,7 @@ public class DatabaseManager {
                             rs.getDouble("multiplier"),
                             rs.getBoolean("is_permanent") ? -1 : System.currentTimeMillis() + rs.getLong("remaining_time"),
                             rs.getString("profession"),
+                            rs.getString("stat"),
                             rs.getBoolean("is_permanent"),
                             true, ownerId, offlineRate
                     );

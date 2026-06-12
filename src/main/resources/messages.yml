@@ -45,6 +45,8 @@ share:
   format:
     permanent: "<id> (Permanent x<mult>)"
     duration: "<id> (x<mult>, <time>)"
+    stat_permanent: "<id> (<stat> +<amount>, Permanent)"
+    stat_duration: "<id> (<stat> +<amount>, <time>)"
 
   owner_offline: "&cThe owner of this booster is currently offline."
   leave_success: "&aSuccessfully cancelled shared boosters from &b<owner>&a."
@@ -64,6 +66,8 @@ booster:
     extend: "&aBooster &e<id> &ahas been extended by &b<time> seconds&a!"
     permanent: "&aYou received a Permanent Booster: &e<id> &7(x<multiplier>)&a!"
     duration: "&aYou received a Booster: &e<id> &7(x<multiplier> for <time>s)&a!"
+    stat_permanent: "&aYou received a Permanent Stat Booster: &e<id> &7(+<amount>)&a!"
+    stat_duration: "&aYou received a Stat Booster: &e<id> &7(+<amount> for <time>s)&a!"
   expired: "&cYour booster &e<id> &chas expired!"
 
 log:

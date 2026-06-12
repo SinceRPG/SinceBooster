@@ -14,6 +14,7 @@ public class Booster {
     private final String id;
     private final double multiplier;
     private final String profession;
+    private final String stat;
     private final boolean permanent;
     private final Set<UUID> sharedPlayers = ConcurrentHashMap.newKeySet();
     private UUID ownerUUID;
@@ -25,6 +26,18 @@ public class Booster {
         this.id = id;
         this.multiplier = multiplier;
         this.profession = profession;
+        this.stat = null;
+        this.permanent = permanent;
+        this.ownerUUID = ownerUUID;
+        this.endTime = permanent ? -1 : System.currentTimeMillis() + (durationSeconds * 1000);
+        this.cachedOfflineRate = -1.0;
+    }
+
+    public Booster(String id, double amount, long durationSeconds, @Nullable String stat, boolean permanent, UUID ownerUUID, boolean statBooster) {
+        this.id = id;
+        this.multiplier = amount;
+        this.profession = null;
+        this.stat = stat == null ? null : stat.trim().toUpperCase();
         this.permanent = permanent;
         this.ownerUUID = ownerUUID;
         this.endTime = permanent ? -1 : System.currentTimeMillis() + (durationSeconds * 1000);
@@ -33,10 +46,15 @@ public class Booster {
 
     // Constructor 2: Loaded from DB
     public Booster(String id, double multiplier, long endTime, @Nullable String profession, boolean permanent, boolean isLoad, UUID ownerUUID, double cachedOfflineRate) {
+        this(id, multiplier, endTime, profession, null, permanent, isLoad, ownerUUID, cachedOfflineRate);
+    }
+
+    public Booster(String id, double multiplier, long endTime, @Nullable String profession, @Nullable String stat, boolean permanent, boolean isLoad, UUID ownerUUID, double cachedOfflineRate) {
         this.id = id;
         this.multiplier = multiplier;
         this.endTime = endTime;
         this.profession = profession;
+        this.stat = stat == null ? null : stat.trim().toUpperCase();
         this.permanent = permanent;
         this.ownerUUID = ownerUUID;
         this.cachedOfflineRate = cachedOfflineRate;
@@ -101,6 +119,14 @@ public class Booster {
         return profession;
     }
 
+    public String getStat() {
+        return stat;
+    }
+
+    public boolean isStatBooster() {
+        return stat != null && !stat.isBlank();
+    }
+
     public boolean isPermanent() {
         return permanent;
     }
@@ -112,11 +138,12 @@ public class Booster {
         Booster booster = (Booster) o;
         return Objects.equals(id, booster.id) &&
                 Objects.equals(profession, booster.profession) &&
+                Objects.equals(stat, booster.stat) &&
                 Objects.equals(ownerUUID, booster.ownerUUID);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, profession, ownerUUID);
+        return Objects.hash(id, profession, stat, ownerUUID);
     }
 }

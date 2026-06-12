@@ -58,6 +58,7 @@ public class MMOCoreHook implements Listener {
 
     private boolean isValidBooster(Booster b, Profession prof) {
         if (!b.isValid()) return false;
+        if (b.isStatBooster()) return false;
         if (b.getProfession() == null) return prof == null;
         if (prof == null) return false;
         return b.getProfession().equalsIgnoreCase(prof.getId());

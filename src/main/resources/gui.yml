@@ -29,6 +29,7 @@ booster_list:
     offline_owner_suffix: "(Off)"
     class_type: "Class XP"
     profession_type: "Job: <profession>"
+    stat_type: "Stat: <stat>"
     unknown_player: "Unknown"
 
   # ===================================================

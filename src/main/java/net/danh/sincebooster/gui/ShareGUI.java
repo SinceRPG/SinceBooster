@@ -180,13 +180,13 @@ public class ShareGUI implements Listener {
                 String timeStr = formatTime(Math.max(0, left));
                 String id = b.getId().toUpperCase();
 
-                String typeColor = (b.getProfession() == null) ? "<aqua>" : "<green>";
+                String typeColor = b.isStatBooster() ? "<gold>" : ((b.getProfession() == null) ? "<aqua>" : "<green>");
                 String typeName = getBoosterTypeName(b);
 
                 double baseMult = b.getMultiplier();
                 double receiverRateConfig = plugin.getPlayerDataHandler().getSession(p.getUniqueId()).getReceiverBuffRate();
                 double recEfficiency = receiverRateConfig * 100.0;
-                double recMult = 1.0 + ((baseMult - 1.0) * (recEfficiency / 100.0));
+                double recMult = b.isStatBooster() ? baseMult * (recEfficiency / 100.0) : 1.0 + ((baseMult - 1.0) * (recEfficiency / 100.0));
 
                 int currentShare = b.getSharedPlayers().size();
                 boolean isFull = currentShare >= maxShare;
@@ -275,7 +275,7 @@ public class ShareGUI implements Listener {
     }
 
     private ItemStack createDetailedShareItem(Booster b, Player p, int maxShare) {
-        Material mat = (b.getProfession() == null) ? Material.NETHER_STAR : Material.ENCHANTED_BOOK;
+        Material mat = b.isStatBooster() ? Material.AMETHYST_SHARD : ((b.getProfession() == null) ? Material.NETHER_STAR : Material.ENCHANTED_BOOK);
         ConfigurationSection baseSec = getGui().getConfig().getConfigurationSection("share_gui.booster_selector.items.booster");
 
         if (baseSec != null && baseSec.contains("material")) {
@@ -291,13 +291,13 @@ public class ShareGUI implements Listener {
         String timeStr = formatTime(Math.max(0, left));
         String id = b.getId().toUpperCase();
 
-        String typeColor = (b.getProfession() == null) ? "<aqua>" : "<green>";
+        String typeColor = b.isStatBooster() ? "<gold>" : ((b.getProfession() == null) ? "<aqua>" : "<green>");
         String typeName = getBoosterTypeName(b);
 
         double baseMult = b.getMultiplier();
         double receiverRateConfig = plugin.getPlayerDataHandler().getSession(p.getUniqueId()).getReceiverBuffRate();
         double recEfficiency = receiverRateConfig * 100.0;
-        double recMult = 1.0 + ((baseMult - 1.0) * (recEfficiency / 100.0));
+        double recMult = b.isStatBooster() ? baseMult * (recEfficiency / 100.0) : 1.0 + ((baseMult - 1.0) * (recEfficiency / 100.0));
 
         int currentShare = b.getSharedPlayers().size();
         boolean isFull = currentShare >= maxShare;
@@ -397,6 +397,10 @@ public class ShareGUI implements Listener {
     }
 
     private String getBoosterTypeName(Booster booster) {
+        if (booster.isStatBooster()) {
+            return getGui().getString("booster_list.formats.stat_type", "Stat: <stat>")
+                    .replace("<stat>", booster.getStat().toUpperCase());
+        }
         if (booster.getProfession() == null) {
             return getGui().getString("booster_list.formats.class_type", "Class XP");
         }

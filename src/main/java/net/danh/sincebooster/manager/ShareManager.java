@@ -59,6 +59,8 @@ public class ShareManager {
     }
 
     public double getFinalMultiplier(Booster booster, UUID receiverUUID) {
+        if (booster.isStatBooster()) return 1.0;
+
         if (booster.getOwnerUUID().equals(receiverUUID)) {
             double bonus = booster.getMultiplier() - 1.0;
             if (!booster.getSharedPlayers().isEmpty()) {
@@ -206,8 +208,10 @@ public class ShareManager {
     }
 
     public String getBoosterDisplayName(Booster b) {
-        String formatKey = b.isPermanent() ? "share.format.permanent" : "share.format.duration";
-        String format = plugin.getMessagesFile().getString(formatKey, "<id> (x<mult>)");
+        String formatKey;
+        if (b.isStatBooster()) formatKey = b.isPermanent() ? "share.format.stat_permanent" : "share.format.stat_duration";
+        else formatKey = b.isPermanent() ? "share.format.permanent" : "share.format.duration";
+        String format = plugin.getMessagesFile().getString(formatKey, b.isStatBooster() ? "<id> (<stat> +<amount>)" : "<id> (x<mult>)");
         long left = Math.max(0, (b.getEndTime() - System.currentTimeMillis()) / 1000);
         long d = left / 86400, h = (left % 86400) / 3600, m = (left % 3600) / 60, s = left % 60;
         String timeStr = plugin.getGuiFile().getString("booster_list.formats.time_left", "<day>d <hour>h <min>m <sec>s")
@@ -215,7 +219,11 @@ public class ShareManager {
                 .replace("<hour>", String.valueOf(h))
                 .replace("<min>", String.valueOf(m))
                 .replace("<sec>", String.valueOf(s));
-        return format.replace("<id>", b.getId().toUpperCase()).replace("<mult>", String.valueOf(b.getMultiplier())).replace("<time>", timeStr);
+        return format.replace("<id>", b.getId().toUpperCase())
+                .replace("<mult>", String.valueOf(b.getMultiplier()))
+                .replace("<amount>", String.valueOf(b.getMultiplier()))
+                .replace("<stat>", b.getStat() == null ? "" : b.getStat())
+                .replace("<time>", timeStr);
     }
 
     public void sendInviteBatch(Player sender, Player receiver, List<Booster> boosters) {

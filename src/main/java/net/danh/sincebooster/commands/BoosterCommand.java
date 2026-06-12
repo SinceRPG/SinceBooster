@@ -9,6 +9,7 @@ import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
+import io.lumine.mythic.lib.MythicLib;
 import net.Indyuce.mmocore.MMOCore;
 import net.Indyuce.mmocore.experience.Profession;
 import net.danh.sincebooster.SinceBooster;
@@ -148,6 +149,27 @@ public class BoosterCommand {
                                                             .then(Commands.argument("profession", StringArgumentType.word())
                                                                     .suggests((ctx, builder) -> suggestProfessions(builder))
                                                                     .executes(ctx -> executeGive(ctx, true, StringArgumentType.getString(ctx, "profession")))
+                                                            )
+                                                    )
+                                            )
+                                    )
+                            )
+                    )
+                    .then(Commands.literal("give-stat")
+                            .requires(s -> s.getSender().hasPermission("sincebooster.admin"))
+                            .then(Commands.argument("target", StringArgumentType.word())
+                                    .suggests((ctx, builder) -> suggestPlayers(builder))
+                                    .then(Commands.argument("id", StringArgumentType.word())
+                                            .then(Commands.argument("stat", StringArgumentType.word())
+                                                    .suggests((ctx, builder) -> suggestStats(builder))
+                                                    .then(Commands.argument("amount", DoubleArgumentType.doubleArg())
+                                                            .then(Commands.literal("duration")
+                                                                    .then(Commands.argument("seconds", LongArgumentType.longArg(1))
+                                                                            .executes(ctx -> executeGiveStat(ctx, false))
+                                                                    )
+                                                            )
+                                                            .then(Commands.literal("permanent")
+                                                                    .executes(ctx -> executeGiveStat(ctx, true))
                                                             )
                                                     )
                                             )
@@ -384,6 +406,13 @@ public class BoosterCommand {
         return builder.buildFuture();
     }
 
+    private CompletableFuture<Suggestions> suggestStats(SuggestionsBuilder builder) {
+        if (Bukkit.getPluginManager().isPluginEnabled("MythicLib")) {
+            for (String stat : MythicLib.inst().getStats().getRegisteredStats()) builder.suggest(stat);
+        }
+        return builder.buildFuture();
+    }
+
     private int executeGive(CommandContext<CommandSourceStack> ctx, boolean isPerm, String prof) {
         String tName = StringArgumentType.getString(ctx, "target");
         Player t = Bukkit.getPlayer(tName);
@@ -392,6 +421,18 @@ public class BoosterCommand {
         double mult = DoubleArgumentType.getDouble(ctx, "multiplier");
         long sec = isPerm ? 0 : LongArgumentType.getLong(ctx, "seconds");
         plugin.getBoosterManager().giveBooster(t, id, mult, sec, prof, isPerm);
+        return 1;
+    }
+
+    private int executeGiveStat(CommandContext<CommandSourceStack> ctx, boolean isPerm) {
+        String tName = StringArgumentType.getString(ctx, "target");
+        Player t = Bukkit.getPlayer(tName);
+        if (t == null) return 0;
+        String id = StringArgumentType.getString(ctx, "id");
+        String stat = StringArgumentType.getString(ctx, "stat");
+        double amount = DoubleArgumentType.getDouble(ctx, "amount");
+        long sec = isPerm ? 0 : LongArgumentType.getLong(ctx, "seconds");
+        plugin.getBoosterManager().giveStatBooster(t, id, stat, amount, sec, isPerm);
         return 1;
     }
 

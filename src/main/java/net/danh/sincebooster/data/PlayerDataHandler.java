@@ -101,11 +101,12 @@ public class PlayerDataHandler {
         String bId = rs.getString("booster_id");
         double mult = rs.getDouble("multiplier");
         String prof = rs.getString("profession");
+        String stat = rs.getString("stat");
         String sharedRaw = rs.getString("shared_with");
 
         long newEndTime = perm ? -1 : System.currentTimeMillis() + remaining;
 
-        Booster b = new Booster(bId, mult, newEndTime, prof, perm, true, ownerUUID, -1.0);
+        Booster b = new Booster(bId, mult, newEndTime, prof, stat, perm, true, ownerUUID, -1.0);
 
         if (sharedRaw != null && !sharedRaw.isEmpty()) {
             for (String sUUID : sharedRaw.split(",")) {
@@ -169,7 +170,7 @@ public class PlayerDataHandler {
 
                 if (!boosters.isEmpty()) {
                     String insBooster = "INSERT INTO " + plugin.getDatabaseManager().getBoostersTable() +
-                            " (uuid, booster_id, multiplier, profession, is_permanent, remaining_time, shared_with) VALUES (?, ?, ?, ?, ?, ?, ?)";
+                            " (uuid, booster_id, multiplier, profession, stat, is_permanent, remaining_time, shared_with) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
                     try (PreparedStatement ps = conn.prepareStatement(insBooster)) {
                         for (Booster b : boosters) {
                             if (b.isValid()) {
@@ -177,11 +178,12 @@ public class PlayerDataHandler {
                                 ps.setString(2, b.getId());
                                 ps.setDouble(3, b.getMultiplier());
                                 ps.setString(4, b.getProfession());
-                                ps.setBoolean(5, b.isPermanent());
+                                ps.setString(5, b.getStat());
+                                ps.setBoolean(6, b.isPermanent());
                                 long remaining = b.isPermanent() ? 0 : Math.max(0, b.getEndTime() - System.currentTimeMillis());
-                                ps.setLong(6, remaining);
+                                ps.setLong(7, remaining);
                                 String sharedStr = b.getSharedPlayers().stream().map(UUID::toString).collect(Collectors.joining(","));
-                                ps.setString(7, sharedStr);
+                                ps.setString(8, sharedStr);
                                 ps.addBatch();
                             }
                         }

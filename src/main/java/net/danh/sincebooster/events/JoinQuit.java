@@ -35,6 +35,7 @@ public class JoinQuit implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent e) {
         UUID quitUUID = e.getPlayer().getUniqueId();
+        plugin.getStatBoosterManager().clear(e.getPlayer());
         plugin.getBoosterManager().getShareManager().updateOfflineSharesOnQuit(e.getPlayer());
         plugin.getPlayerDataHandler().saveData(e.getPlayer(), true);
 

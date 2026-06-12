@@ -178,7 +178,9 @@ public class BoosterGUI implements Listener {
 
         for (DisplayBooster db : displayList) {
             double bonus = displayBoosterBonus(db);
-            if (db.booster.getProfession() == null) {
+            if (db.booster.isStatBooster()) {
+                continue;
+            } else if (db.booster.getProfession() == null) {
                 totalAdd += bonus;
             } else {
                 String p = db.booster.getProfession();
@@ -235,7 +237,7 @@ public class BoosterGUI implements Listener {
         String timeStr = formatTime(Math.max(0, left));
         String id = b.getId().toUpperCase();
 
-        String typeColor = (b.getProfession() == null) ? "<aqua>" : "<green>";
+        String typeColor = b.isStatBooster() ? "<gold>" : ((b.getProfession() == null) ? "<aqua>" : "<green>");
         String typeName = getBoosterTypeName(b);
 
         String nameFormatKey = b.isPermanent() ? "name_perm" : "name_time";
@@ -412,7 +414,8 @@ public class BoosterGUI implements Listener {
         List<DisplayBooster> profBoosters = new ArrayList<>();
 
         for (DisplayBooster db : displayList) {
-            if (db.booster.getProfession() == null) classBoosters.add(db);
+            if (db.booster.isStatBooster()) profBoosters.add(db);
+            else if (db.booster.getProfession() == null) classBoosters.add(db);
             else profBoosters.add(db);
         }
 
@@ -493,7 +496,7 @@ public class BoosterGUI implements Listener {
         String keyType = db.isOwner ? "own" : "received";
         ConfigurationSection baseSec = getGui().getConfig().getConfigurationSection("booster_list.items." + keyType);
 
-        Material mat = db.isOwner ? ((b.getProfession() == null) ? Material.NETHER_STAR : Material.ENCHANTED_BOOK) : Material.EXPERIENCE_BOTTLE;
+        Material mat = db.isOwner ? (b.isStatBooster() ? Material.AMETHYST_SHARD : ((b.getProfession() == null) ? Material.NETHER_STAR : Material.ENCHANTED_BOOK)) : Material.EXPERIENCE_BOTTLE;
         if (baseSec != null && baseSec.contains("material")) {
             Material overridden = Material.matchMaterial(baseSec.getString("material"));
             if (overridden != null) mat = overridden;
@@ -507,7 +510,7 @@ public class BoosterGUI implements Listener {
         String timeStr = formatTime(Math.max(0, left));
         String id = b.getId().toUpperCase();
 
-        String typeColor = (b.getProfession() == null) ? "<aqua>" : "<green>";
+        String typeColor = b.isStatBooster() ? "<gold>" : ((b.getProfession() == null) ? "<aqua>" : "<green>");
         String typeName = getBoosterTypeName(b);
         String statusPath = b.isPermanent() ? "booster_list.items.status_perm" : "booster_list.items.status_time";
         String status = getGui().getString(statusPath).replace("<time_left>", timeStr);
@@ -586,7 +589,7 @@ public class BoosterGUI implements Listener {
 
         double totalAdd = 0, ownAdd = 0, sharedAdd = 0;
         for (DisplayBooster db : list) {
-            if (db.booster.getProfession() == null) {
+            if (!db.booster.isStatBooster() && db.booster.getProfession() == null) {
                 double bonus = displayBoosterBonus(db);
                 totalAdd += bonus;
                 if (db.isOwner) ownAdd += bonus;
@@ -609,7 +612,7 @@ public class BoosterGUI implements Listener {
         Map<String, Double> totals = new HashMap<>();
         for (DisplayBooster db : list) {
             String p = db.booster.getProfession();
-            if (p != null) {
+            if (!db.booster.isStatBooster() && p != null) {
                 double bonus = displayBoosterBonus(db);
                 totals.put(p, totals.getOrDefault(p, 0.0) + bonus);
             }
@@ -642,6 +645,10 @@ public class BoosterGUI implements Listener {
     }
 
     private String getBoosterTypeName(Booster booster) {
+        if (booster.isStatBooster()) {
+            return getGui().getString("booster_list.formats.stat_type", "Stat: <stat>")
+                    .replace("<stat>", booster.getStat().toUpperCase());
+        }
         if (booster.getProfession() == null) {
             return getGui().getString("booster_list.formats.class_type", "Class XP");
         }

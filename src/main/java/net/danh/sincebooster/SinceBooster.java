@@ -9,6 +9,7 @@ import net.danh.sincebooster.gui.ManageShareGUI;
 import net.danh.sincebooster.gui.ShareGUI;
 import net.danh.sincebooster.hooks.MMOCoreHook;
 import net.danh.sincebooster.manager.BoosterManager;
+import net.danh.sincebooster.manager.StatBoosterManager;
 import net.danh.sincebooster.utils.ColorUtils;
 import net.danh.sincebooster.utils.ConfigUtils;
 import net.danh.sincebooster.utils.FoliaScheduler;
@@ -37,6 +38,7 @@ public final class SinceBooster extends JavaPlugin {
     private PlayerDataHandler playerDataHandler;
     private DatabaseManager databaseManager;
     private BoosterGUI boosterGUI;
+    private StatBoosterManager statBoosterManager;
     private FoliaScheduler foliaScheduler;
 
     public static SinceBooster getPlugin() {
@@ -57,6 +59,7 @@ public final class SinceBooster extends JavaPlugin {
         playerDataHandler = new PlayerDataHandler(this);
 
         boosterManager = new BoosterManager(this);
+        statBoosterManager = new StatBoosterManager(this);
         boosterGUI = new BoosterGUI(this);
 
         registerListeners(
@@ -76,11 +79,13 @@ public final class SinceBooster extends JavaPlugin {
         new BoosterCommand(this).registerCommands();
 
         boosterGUI.startUpdateTask();
+        statBoosterManager.startUpdateTask();
         startAutoSaveTask();
     }
 
     @Override
     public void onDisable() {
+        if (statBoosterManager != null) statBoosterManager.clearAll();
         if (foliaScheduler != null) foliaScheduler.cancelTasks();
         if (playerDataHandler != null) {
             getLogger().info(messagesFile.getString("log.saving_data", "Saving player data..."));
@@ -158,6 +163,10 @@ public final class SinceBooster extends JavaPlugin {
 
     public BoosterGUI getBoosterGUI() {
         return boosterGUI;
+    }
+
+    public StatBoosterManager getStatBoosterManager() {
+        return statBoosterManager;
     }
 
     public FoliaScheduler getFoliaScheduler() {
